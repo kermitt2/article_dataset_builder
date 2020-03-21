@@ -12,6 +12,7 @@ target
 *.zip
 *.tar.gz
 data/*
+!data/.gitkeep 
 my_config.json
 __pycache__
 consolidated_metadata.json
