@@ -46,7 +46,7 @@ For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronav
 
 > python3 harvest --csv source_metadata.csv --out consolidated_metadata_out.json
 
-This will generate a consolidated metadata file (--out,  or consolidated_metadata.json by default), upload full text files, 
+This will generate a consolidated metadata file (specified by `--out`,  or `consolidated_metadata.json` by default), upload full text files, 
 converted tei.xml files and other optional files either in the local file system (under data_path indicated in the config.json 
 file) or on a S3 bucket if the fields are filled in config.json. 
 
@@ -58,18 +58,22 @@ you can set a specific config file name like this:
 
 > python3 harvest --csv all_sources_metadata_2020-03-13.csv --config my_config_file.json    
 
-Structure of the generated files:
+Structure of the generated files for an article having as UUID identifier `98da17ff-bf7e-4d43-bdf2-4d8d831481e5`
 
-article_uuid/article_uuid.pdf
-article_uuid/article_uuid.tei.xml
+```
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pdf
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.tei.xml
+```
 
 Optional additional files:
 
-article_uuid/article_uuid_ref_annotations.json
-article_uuid/article_uuid-thumb-small.png
-article_uuid/article_uuid-thumb-medium.png
-article_uuid/article_uuid-thumb-large.png
+```
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-ref-annotations.json
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-small.png
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-medium.png
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-large.png
+```
 
-article_uuid for a particular article is given in the generated `consolidated_metadata.csv` file.
+The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file.
 
 
