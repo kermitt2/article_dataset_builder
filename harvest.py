@@ -64,9 +64,6 @@ class Harverster(object):
         # lmdb environment for storing mapping between sha/doi/pmcid and uuid
         self.env_uuid = None
 
-        # lmdb environment for keeping track of failures
-        #self.env_fail = None
-
         self._init_lmdb()
 
     def _load_config(self, path='./config.json'):
@@ -101,9 +98,6 @@ class Harverster(object):
 
         envFilePath = os.path.join(self.config["data_path"], 'uuid')
         self.env_uuid = lmdb.open(envFilePath, map_size=map_size)
-
-        #envFilePath = os.path.join(self.config["data_path"], 'fail')
-        #self.env_fail = lmdb.open(envFilePath, map_size=map_size)
 
     def unpaywalling_doi(self, doi):
         """
@@ -171,16 +165,12 @@ class Harverster(object):
         # close environments
         self.env_entries.close()
         self.env_uuid.close()
-        #self.env_fail.close()
 
         envFilePath = os.path.join(self.config["data_path"], 'entries')
         shutil.rmtree(envFilePath)
 
         envFilePath = os.path.join(self.config["data_path"], 'uuid')
         shutil.rmtree(envFilePath)
-
-        #envFilePath = os.path.join(self.config["data_path"], 'fail')
-        #shutil.rmtree(envFilePath)
 
         # clean any possibly remaining tmp files
         for f in os.listdir(self.config["data_path"]):
@@ -320,12 +310,14 @@ class Harverster(object):
                    pass
 
     def harvest_dois(self, dois_file):
-        with open(filepath, 'rt') as fp:
+        with open(dois_file, 'rt') as fp:
             line_count = 0 # total count of articles
             i = 0 # counter for article per batch
             identifiers = []
             dois = []  
             for count, line in enumerate(fp):
+                if len(line.strip()) == 0:
+                    continue
 
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
@@ -336,20 +328,21 @@ class Harverster(object):
                     identifiers = []
                     dois = []
 
+                the_doi = line.strip()
                 # check if the entry has already been processed
-                if self.getUUIDByStrongIdentifier(row["sha"]) is not None:
+                if self.getUUIDByStrongIdentifier(the_doi) is not None:
                     continue
 
                 # we need a new identifier
                 identifier = str(uuid.uuid4())
                 identifiers.append(identifier)
-                dois.append(line.trim())
+                dois.append(the_doi)
     
                 line_count += 1
                 i += 1
             
             # we need to process the last incomplete batch, if not empty
-            if len(identifiers) >0:
+            if len(identifiers) > 0:
                 with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                     # branch to the right entry processor, depending on the input csv 
                     executor.map(self.processEntryDOI, identifiers, dois)
@@ -398,10 +391,12 @@ class Harverster(object):
             print("processed", str(line_count), "articles")
 
     def processEntryDOI(self, identifier, doi):
-        localJson = self.biblio_glutton_lookup(doi=_clean_doi(doi), pmcid=None, pmid=None, istex_id=None)
+        doi = _clean_doi(doi)
+        localJson = self.biblio_glutton_lookup(doi=doi, pmcid=None, pmid=None, istex_id=None)
         if localJson is None:
             localJson = {}
             localJson['DOI'] = doi
+        localJson["id"] = identifier
 
         print("processing", localJson['DOI'], "as", identifier)
 
@@ -474,14 +469,15 @@ class Harverster(object):
 
     def processTask(self, localJson):
         identifier = localJson["id"]
-        print("processing", identifier)
 
         # call Unpaywall
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
             try:
                 localUrl = self.unpaywalling_doi(localJson['DOI'])
             except:
-                print("Failure to call Unpaywall API")   
+                print("Unpaywall API call not succesful")   
+                localUrl = none
+                pass
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
                     # we can try to use the OA link from bibilio-glutton as fallback (though not very optimistic on this!)
@@ -501,11 +497,6 @@ class Harverster(object):
                 _download(localUrl, pdf_filename)
                 if _is_valid_file(pdf_filename, "pdf"):
                     localJson["has_valid_pdf"] = True
-            '''
-            else:
-                with self.env_fail.begin(write=True) as txn_fail:
-                    txn_fail.put(identifier.encode(encoding='UTF-8'), "Invalid URL".encode(encoding='UTF-8'))
-            '''
 
         # GROBIDification if PDF available 
         if not localJson["has_valid_tei"]:
@@ -518,18 +509,8 @@ class Harverster(object):
                 self.run_grobid(pdf_filename, tei_filename, annotation_filename)
                 if _is_valid_file(tei_filename, "xml"):
                     localJson["has_valid_tei"] = True
-                '''
-                else:
-                    with self.env_fail.begin(write=True) as txn_fail:
-                        txn_fail.put(identifier.encode(encoding='UTF-8'), "Invalid TEI".encode(encoding='UTF-8'))
-                '''
                 if self.annotation and _is_valid_file(annotation_filename, "json"):
                     localJson["has_valid_ref_annotation"] = True
-                    # remove the entry in fail, as it is now sucessful
-                    '''
-                    with self.env_fail.begin(write=True) as txn_fail2:
-                        txn_fail2.delete(identifier.encode(encoding='UTF-8'))
-                    '''
 
         # thumbnail if requested 
         if not localJson["has_valid_thumbnail"] and self.thumbnail:
@@ -671,7 +652,6 @@ class Harverster(object):
                     nb_invalid_pdf += 1
                     nb_invalid_tei += 1
                 elif not localJson["has_valid_tei"]:
-                    localJsons.append(localJson)
                     nb_invalid_tei += 1
                 else:
                     nb_total_valid += 1
@@ -696,24 +676,19 @@ class Harverster(object):
                     i = 0
                     localJsons = []
 
-                '''
-                failed_uuid = key.decode(encoding='UTF-8')
-                reason = value.decode(encoding='UTF-8')
-                print("retry failed entry:", failed_uuid, reason)
-                txn_entries = self.env_entries.begin()
-                metadata_value = txn_entries.get(failed_uuid.encode(encoding='UTF-8'))
-                localJsons.append(_deserialize_pickle(metadata_value))
-                '''
                 localJson = _deserialize_pickle(value)
                 if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"] or not localJson["has_valid_tei"]:
                     localJsons.append(localJson)
                     i += 1
+                    print("re-processing", localJson["id"])
                 elif self.thumbnail and not localJson["has_valid_thumbnail"]:
                     localJsons.append(localJson)
                     i += 1
+                    print("re-processing for thumbnails", localJson["id"])
                 elif self.annotation and not localJson["has_valid_ref_annotation"]:
                     localJsons.append(localJson)
                     i += 1
+                    print("re-processing for PDF annotations", localJson["id"])
 
         # we need to process the latest incomplete batch (if not empty)
         if len(localJsons)>0:
@@ -734,6 +709,24 @@ def _clean_doi(doi):
         doi = doi.replace("http://dx.doi.org/", "")
     return doi.strip().lower()
 
+def _check_compression(file):
+    '''
+    check if a file is compressed, if yes decompress and replace by the decompressed version
+    '''
+    if os.path.isfile(file):
+        if os.path.getsize(file) == 0:
+            return False
+        file_type = magic.from_file(file, mime=True)
+        if file_type == 'application/gzip':
+            # uncompressed in tmp file
+            with gzip.open(file, 'rb') as f_in:
+                with open(file+'.uncompressed', 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
+            # replace the file
+            shutil.copyfile(file+'.uncompressed', file)
+            # delete the tmp file
+            os.remove(file+'.uncompressed')
+
 def _is_valid_file(file, mime_type):
     target_mime = []
     if mime_type == 'xml':
@@ -749,30 +742,6 @@ def _is_valid_file(file, mime_type):
             return False
         file_type = magic.from_file(file, mime=True)
     return file_type in target_mime
-
-def _is_valid_pdf(file):
-    file_type = ""
-    if os.path.isfile(file):
-        if os.path.getsize(file) == 0:
-            return False
-        file_type = magic.from_file(file, mime=True)
-    return "application/pdf" in file_type
-
-def _is_valid_xml(file):
-    file_type = ""
-    if os.path.isfile(file):
-        if os.path.getsize(file) == 0:
-            return False
-        file_type = magic.from_file(file, mime=True)
-    return "application/xml" in file_type or "text/xml" in file_type
-
-def _is_valid_json(file):
-    file_type = ""
-    if os.path.isfile(file):
-        if os.path.getsize(file) == 0:
-            return False
-        file_type = magic.from_file(file, mime=True)
-    return "application/json" in file_type
 
 def _biblio_glutton_url(biblio_glutton_base, biblio_glutton_port):
     if biblio_glutton_base.endswith("/"):
@@ -849,6 +818,8 @@ def _download(url, filename):
                 print("warning: no pdf found in archive:", filename)
             if os.path.isfile(filename):
                 os.remove(filename)
+        # if the used version of wget does not decompress automatically, the following ensures it is done
+        _check_compression(filename)
 
     except subprocess.CalledProcessError as e:   
         print("e.returncode", e.returncode)
@@ -907,7 +878,6 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="./config.json", help="path to the config file, default is ./config.json") 
     parser.add_argument("--reset", action="store_true", help="ignore previous processing states, and re-init the harvesting process from the beginning") 
     parser.add_argument("--reprocess", action="store_true", help="reprocessed existing failed entries") 
-    #parser.add_argument("--increment", action="store_true", help="augment an existing harvesting with an additional csv file") 
     parser.add_argument("--thumbnail", action="store_true", help="generate thumbnail files for the front page of the harvested PDF") 
     parser.add_argument("--annotation", action="store_true", help="generate bibliographical annotations with coordinates for the harvested PDF") 
     #parser.add_argument("--sample", type=int, default=None, help="harvest only a random sample of indicated size")
