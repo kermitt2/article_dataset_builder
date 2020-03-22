@@ -9,9 +9,9 @@ Currently supported:
 
 ## What:
 
-- Perform some metadata enrichment/agregation via biblio-glutton & CrossRef API and output consolidated metadata in a json file (default output `consolidated_metadata.csv`)
+- Perform some metadata enrichment/agregation via [biblio-glutton](https://github.com/kermitt2/biblio-glutton) & CrossRef web API](https://github.com/CrossRef/rest-api-doc) and output consolidated metadata in a json file 
 
-- Harvester PDF from article set (basic metadata provided in a csv file), e.g. typically available Open Access PDF via Unpaywall API (and some heuristics) 
+- Harvest PDF from the specification of the article set (list of strong identifiers or basic metadata provided in a csv file), typically PDF available in Open Access PDF via the [Unpaywall API](https://unpaywall.org/products/api) (and some heuristics) 
 
 - Perform [Grobid](https://github.com/kermitt2/grobid) full processing of PDF (including bibliographical reference consolidation and OA access resolution of the cited references)
 
@@ -21,7 +21,7 @@ Optionally:
 
 - upload the generated dataset on S3 instead of the local file system
 
-- generate json PDF annotation (with coordinates) for inline reference markers and bibliographical references 
+- generate json PDF annotations (with coordinates) for inline reference markers and bibliographical references 
 
 ## Installation
 
@@ -33,13 +33,7 @@ The following tools need to be installed and running, with access information sp
 
 It is possible to use public demo instances of these services, but the process will not be able to scale and won't be reliable given that the public servers are very frequently overloaded. 
 
-As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the Crossref web API and Unpaywall API services are used to cover the gap:
-
-- [Unpaywall API](https://unpaywall.org/products/api)
-
-- [CrossRef web API](https://github.com/CrossRef/rest-api-doc)
-
-You need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. 
+As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and [Unpaywall API](https://unpaywall.org/products/api) services are used to cover the gap. For these two services, you need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. 
 
 An important parameter in the `config.json` file is the number of parallel document processing that is allowed, this is specified by the attribute `batch_size`, default value being `10` (so 10 documents max downloaded in parallel with distinct threads/workers and processed by Grobid in parallel). You can set this number according to your available number of threads.   
 
