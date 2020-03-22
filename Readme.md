@@ -45,6 +45,30 @@ An important parameter in the `config.json` file is the number of parallel docum
 
 ## Usage
 
+```
+usage: harvest.py [-h] [--dois DOIS] [--cord19 CORD19] [--config CONFIG]
+                  [--reset] [--reprocess] [--thumbnail] [--annotation]
+                  [--dump DUMP]
+
+COVIDataset harvester
+
+optional arguments:
+  -h, --help       show this help message and exit
+  --dois DOIS      path to a file describing a dataset articles as a simple
+                   list of DOI (one per line)
+  --cord19 CORD19  path to the csv file describing the CORD-19 dataset
+                   articles
+  --config CONFIG  path to the config file, default is ./config.json
+  --reset          ignore previous processing states, and re-init the
+                   harvesting process from the beginning
+  --reprocess      reprocessed existing failed entries
+  --thumbnail      generate thumbnail files for the front page of the
+                   harvested PDF
+  --annotation     generate bibliographical annotations with coordinates for
+                   the harvested PDF
+  --dump DUMP      write all the consolidated metadata in json
+```
+
 Fill the file `config.json` with relevant service and parameter url, then install the python mess:
 
 > pip3 install -f requirements

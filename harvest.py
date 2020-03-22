@@ -1,51 +1,3 @@
-"""
-What:
-- Harvester for article set (basic metadata provided in a csv file, e.g. CORD-19 csv metadata file)
-- Perform some metadata enrichment/agregation via biblio-glutton and output consolidated metadata in a json file 
-- Perform Grobid full processing of PDF (including bibliographical reference consolidation and OA access resolution)
-
-Optionally: 
-- generate thumbnails for article (first page) 
-- load stuff on S3 instead of local file
-- generate json PDF annotation (with coordinates) for inline reference markers and bibliographical references 
-
-Usage:
-
-Fill the file config.json with relevant service and parameter url, then install the python mess:
-
-> pip3 install -f requirements
-
-and for harvesting the CORD-19 datatset (based on the provided source_metadata.csv) run: 
-
-> python3 harvest --cord19 source_metadata.csv --out consolidated_metadata_out.json
-
-This will generate a consolidated metadata file (--out,  or consolidated_metadata.json by default), upload full text files, 
-converted tei.xml files and other optional files either in the local file system (under data_path indicated in the config.json 
-file) or on a S3 bucket if the fields are filled in config.json. 
-
-for example:
-
-> python3 harvest --cord19 all_sources_metadata_2020-03-13.csv     
-
-you can set a specific config file name like this:
-
-> python3 harvest --cord19 all_sources_metadata_2020-03-13.csv --config my_config_file.json    
-
-Structure of the generated files:
-
-article_uuid/article_uuid.pdf
-article_uuid/article_uuid.tei.xml
-
-Optional additional files:
-
-xx/xx/xx/xx/article_uuid/article_uuid-ref-annotations.json
-xx/xx/xx/xx/article_uuid/article_uuid-thumb-small.png
-xx/xx/xx/xx/article_uuid/article_uuid-thumb-medium.png
-xx/xx/xx/xx/article_uuid/article_uuid-thumb-large.png
-
-article_uuid for a particular article is given in the generated consolidated_metadata.csv file
-"""
-
 import argparse
 import os
 import io
@@ -72,6 +24,20 @@ import lmdb
 map_size = 100 * 1024 * 1024 * 1024 
 
 class Harverster(object):
+    """
+    What:
+    - Harvester for article set (list of DOI or basic metadata provided in a csv file, e.g. CORD-19 csv metadata file) with robust
+      parallel PDF download
+    - Perform some metadata enrichment/agregation via biblio-glutton/CrossRef API and output consolidated metadata in a json file 
+    - Perform Grobid full processing of PDF (including bibliographical reference consolidation and OA access resolution)
+
+    Optionally: 
+    - generate thumbnails for article (first page) 
+    - load stuff on S3 instead of local file
+    - generate json PDF annotation (with coordinates) for inline reference markers and bibliographical references 
+
+    Usage: see the Readme.md file
+    """
 
     def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=None, annotation=False):
         self.config = None   
@@ -970,15 +936,17 @@ if __name__ == "__main__":
     start_time = time.time()
 
     if reprocess:
-        harvester.reprocessFailed()
+        harvester.reprocessFailed()        
     elif csv_path:
         if not os.path.isfile(csv_path):
             print("error: the indicated cvs file path is not valid:", csv_path)
-            sys.exit(0)
-        else if csv_path:
-            harvester.harvest_csv(csv_path)
-        else if dois_path:    
-            harvester.harvest_dois(dois_path)
+            sys.exit(0)    
+        harvester.harvest_csv(csv_path)
+    elif dois_path:    
+        if not os.path.isfile(dois_path):
+            print("error: the indicated DOI file path is not valid:", dois_path)
+            sys.exit(0)    
+        harvester.harvest_dois(dois_path)
 
     harvester.diagnostic()
 
