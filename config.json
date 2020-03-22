@@ -4,7 +4,7 @@
     "aws_secret_access_key": "",
     "bucket_name": "",
     "region": "",
-    "batch_size": 100,
+    "batch_size": 10,
     "pmc_base_ftp": "ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/",
     "pmc_base_web": "https://www.ncbi.nlm.nih.gov/pmc/articles/",
     "arxiv_base": "https://arxiv.org/pdf",
