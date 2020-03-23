@@ -6,6 +6,11 @@ Input currently supported:
 
 - list of DOI in a file, one DOI per line
 - metadata csv input file from [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research)
+- list of PMID in a file, one DOI per line
+- list of PMC ID in a file, one DOI per line
+
+To do:
+- list of ISTEX identifiers or ark, one DOI per line
 
 ## What:
 
@@ -72,9 +77,14 @@ Fill the file `config.json` with relevant service and parameter url, then instal
 
 > pip3 install -f requirements
 
-For instance to process a list of DOI:
+For instance to process a list of DOI (one DOI per line):
 
-> python3 harvest --dois my_dois.txt 
+> python3 harvest --dois test/dois.txt 
+
+Similarly for a list of PMID or PMC ID:
+
+> python3 harvest --dois test/pmids.txt 
+> python3 harvest --dois test/pmcids.txt 
 
 For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can directly use the [source_metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-13/all_sources_metadata_2020-03-13.csv) file by running: 
 

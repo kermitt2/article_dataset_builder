@@ -26,8 +26,8 @@ map_size = 100 * 1024 * 1024 * 1024
 class Harverster(object):
     """
     What:
-    - Harvester for article set (list of DOI or basic metadata provided in a csv file, e.g. CORD-19 csv metadata file) with robust
-      parallel PDF download
+    - Harvester for article set (list of DOI, PMID, PMC ID or basic metadata provided in a csv file, e.g. CORD-19 csv metadata file) 
+      with robust parallel PDF download
     - Perform some metadata enrichment/agregation via biblio-glutton/CrossRef API and output consolidated metadata in a json file 
     - Perform Grobid full processing of PDF (including bibliographical reference consolidation and OA access resolution)
 
@@ -121,29 +121,39 @@ class Harverster(object):
                 return other_oa_location['url_for_pdf']
         return None
 
-    def biblio_glutton_lookup(self, doi=None, pmcid=None, pmid=None, istex_id=None):
+    def biblio_glutton_lookup(self, doi=None, pmcid=None, pmid=None, istex_id=None, istex_ark=None):
         """
         Lookup on biblio_glutton with the provided strong identifiers, return the full agregated biblio_glutton record
         """
         biblio_glutton_url = _biblio_glutton_url(self.config["biblio_glutton_base"], self.config["biblio_glutton_port"])
+        success = False
+        jsonResult = None
 
         if doi is not None and len(doi)>0:
-            print(biblio_glutton_url + "doi=" + doi)
             response = requests.get(biblio_glutton_url, params={'doi': doi})
+            success = (response.status_code == 200)
+            if success:
+                jsonResult = response.json()
 
-        if response.status_code != 200 and pmid is not None and len(pmid)>0:
+        if not success and pmid is not None and len(pmid)>0:
             response = requests.get(biblio_glutton_url + "pmid=" + pmid)
+            success = (response.status_code == 200)
+            if success:
+                jsonResult = response.json()     
 
-        if response.status_code != 200 and pmcid is not None and len(pmcid)>0:
+        if not success and pmcid is not None and len(pmcid)>0:
             response = requests.get(biblio_glutton_url + "pmc=" + pmcid)  
+            success = (response.status_code == 200)
+            if success:
+                jsonResult = response.json()
 
-        if response.status_code != 200 and istex_id is not None and len(istex_id)>0:
+        if not success and istex_id is not None and len(istex_id)>0:
             response = requests.get(biblio_glutton_url + "istexid=" + istex_id)
-
-        jsonResult = None
-        if response.status_code == 200:
-            jsonResult = response.json()
-        else:
+            success = (response.status_code == 200)
+            if success:
+                jsonResult = response.json()
+        
+        if not success and doi is not None and len(doi)>0:
             # let's call crossref as fallback for the X-months gap
             # https://api.crossref.org/works/10.1037/0003-066X.59.1.29
             user_agent = {'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0 (mailto:' 
@@ -329,6 +339,7 @@ class Harverster(object):
                     dois = []
 
                 the_doi = line.strip()
+                the_doi = _clean_doi(the_doi)
                 # check if the entry has already been processed
                 if self.getUUIDByStrongIdentifier(the_doi) is not None:
                     continue
@@ -388,11 +399,86 @@ class Harverster(object):
                     # branch to the right entry processor, depending on the input csv 
                     executor.map(self.processEntryCord19, identifiers, rows)
 
-            print("processed", str(line_count), "articles")
+            print("processed", str(line_count), "article DOI")
+
+    def harvest_pmids(self, pmids_file):
+        with open(pmids_file, 'rt') as fp:
+            line_count = 0 # total count of articles
+            i = 0 # counter for article per batch
+            identifiers = []
+            pmids = []  
+            for count, line in enumerate(fp):
+                if len(line.strip()) == 0:
+                    continue
+
+                if i == self.config["batch_size"]:
+                    with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
+                        executor.map(self.processEntryPMID, identifiers, pmids)
+                    # reinit
+                    i = 0
+                    identifiers = []
+                    pmids = []
+
+                the_pmid = line.strip()
+                # check if the entry has already been processed
+                if self.getUUIDByStrongIdentifier(the_pmid) is not None:
+                    continue
+
+                # we need a new identifier
+                identifier = str(uuid.uuid4())
+                identifiers.append(identifier)
+                pmids.append(the_pmid)
+    
+                line_count += 1
+                i += 1
+            
+            # we need to process the last incomplete batch, if not empty
+            if len(identifiers) > 0:
+                with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
+                    executor.map(self.processEntryPMID, identifiers, pmids)
+
+            print("processed", str(line_count), "article PMID")
+
+    def harvest_pmcids(self, pmcids_file):
+        with open(pmcids_file, 'rt') as fp:
+            line_count = 0 # total count of articles
+            i = 0 # counter for article per batch
+            identifiers = []
+            pmcids = []  
+            for count, line in enumerate(fp):
+                if len(line.strip()) == 0:
+                    continue
+
+                if i == self.config["batch_size"]:
+                    with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
+                        executor.map(self.processEntryPMCID, identifiers, pmids)
+                    # reinit
+                    i = 0
+                    identifiers = []
+                    pmcids = []
+
+                the_pmcid = line.strip()
+                # check if the entry has already been processed
+                if self.getUUIDByStrongIdentifier(the_pmcid) is not None:
+                    continue
+
+                # we need a new identifier
+                identifier = str(uuid.uuid4())
+                identifiers.append(identifier)
+                pmcids.append(the_pmcid)
+    
+                line_count += 1
+                i += 1
+            
+            # we need to process the last incomplete batch, if not empty
+            if len(identifiers) > 0:
+                with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
+                    executor.map(self.processEntryPMCID, identifiers, pmcids)
+
+            print("processed", str(line_count), "article PMC ID")
 
     def processEntryDOI(self, identifier, doi):
-        doi = _clean_doi(doi)
-        localJson = self.biblio_glutton_lookup(doi=doi, pmcid=None, pmid=None, istex_id=None)
+        localJson = self.biblio_glutton_lookup(doi=doi, pmcid=None, pmid=None, istex_id=None, istex_ark=None)
         if localJson is None:
             localJson = {}
             localJson['DOI'] = doi
@@ -400,22 +486,39 @@ class Harverster(object):
 
         print("processing", localJson['DOI'], "as", identifier)
 
-        # init process information
-        localJson["has_valid_pdf"] = False
-        localJson["has_valid_oa_url"] = False
-        localJson["has_valid_tei"] = False
-        localJson["has_valid_ref_annotation"] = False
-        localJson["has_valid_thumbnail"] = False
+        _initProcessStateInformation(localJson)
+        self.updateIdentifierMap(localJson)
+        self.processTask(localJson)
 
-        with self.env_uuid.begin(write=True) as txn_uuid:
-            txn_uuid.put(localJson['DOI'].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
+    def processEntryPMID(self, identifier, pmid):
+        localJson = self.biblio_glutton_lookup(doi=None, pmcid=None, pmid=pmid, istex_id=None, istex_ark=None)
+        if localJson is None:
+            localJson = {}
+            localJson['pmid'] = pmid
+        localJson["id"] = identifier
 
+        print("processing", localJson['pmid'], "as", identifier)
+
+        _initProcessStateInformation(localJson)
+        self.updateIdentifierMap(localJson)
+        self.processTask(localJson)
+
+    def processEntryPMCID(self, identifier, pmcid):
+        localJson = self.biblio_glutton_lookup(doi=None, pmcid=pmcid, pmid=None, istex_id=None, istex_ark=None)
+        if localJson is None:
+            localJson = {}
+            localJson['pmcid'] = pmcid
+        localJson["id"] = identifier
+
+        print("processing", localJson['pmcid'], "as", identifier)
+
+        _initProcessStateInformation(localJson)
+        self.updateIdentifierMap(localJson)
         self.processTask(localJson)
             
-
     def processEntryCord19(self, identifier, row):
         # sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,WHO #Covidence,has_full_text
-        localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None)
+        localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
         if localJson is None:
             localJson = {}
             localJson['title'] = row["title"]
@@ -443,40 +546,36 @@ class Harverster(object):
         if row["pubmed_id"] is not None and len(row["pubmed_id"])>0 and 'pmid' not in localJson:
             localJson['pmid'] = row["pubmed_id"]
 
-        # init process information
-        localJson["has_valid_pdf"] = False
-        localJson["has_valid_oa_url"] = False
-        localJson["has_valid_tei"] = False
-        localJson["has_valid_ref_annotation"] = False
-        localJson["has_valid_thumbnail"] = False
+        _initProcessStateInformation(localJson)
 
         # update uuid lookup map
         with self.env_uuid.begin(write=True) as txn_uuid:
             txn_uuid.put(row["sha"].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
-        if "DOI" in localJson:
-            with self.env_uuid.begin(write=True) as txn_uuid:
-                txn_uuid.put(localJson['DOI'].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
-        '''
-        if "pmcid" in localJson:
-            with self.env_uuid.begin(write=True) as txn_uuid:
-                txn_uuid.put(localJson['pmcid'].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
-        if "pmid" in localJson:
-            with self.env_uuid.begin(write=True) as txn_uuid:
-                txn_uuid.put(localJson['pmid'].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
-        '''
+
+        self.updateIdentifierMap(localJson)
         self.processTask(localJson)
 
+    def updateIdentifierMap(self, localJson):
+        if "DOI" in localJson:
+            with self.env_uuid.begin(write=True) as txn_uuid:
+                txn_uuid.put(localJson['DOI'].encode(encoding='UTF-8'), localJson["id"].encode(encoding='UTF-8'))
+        if "pmcid" in localJson:
+            with self.env_uuid.begin(write=True) as txn_uuid:
+                txn_uuid.put(localJson['pmcid'].encode(encoding='UTF-8'), localJson["id"].encode(encoding='UTF-8'))
+        if "pmid" in localJson:
+            with self.env_uuid.begin(write=True) as txn_uuid:
+                txn_uuid.put(localJson['pmid'].encode(encoding='UTF-8'), localJson["id"].encode(encoding='UTF-8'))
 
     def processTask(self, localJson):
         identifier = localJson["id"]
 
         # call Unpaywall
+        localUrl = None
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
             try:
                 localUrl = self.unpaywalling_doi(localJson['DOI'])
             except:
                 print("Unpaywall API call not succesful")   
-                localUrl = none
                 pass
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
@@ -490,13 +589,14 @@ class Harverster(object):
 
         # let's try to get this damn PDF
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
-        localUrl = localJson["oaLink"]
         if not localJson["has_valid_pdf"] or not localJson["has_valid_tei"] or (self.thumbnail and not localJson["has_valid_thumbnail"]):
-            if localUrl is not None and len(localUrl)>0:
-                print(localUrl)
-                _download(localUrl, pdf_filename)
-                if _is_valid_file(pdf_filename, "pdf"):
-                    localJson["has_valid_pdf"] = True
+            if "oaLink" in localJson:
+                localUrl = localJson["oaLink"]
+                if localUrl is not None and len(localUrl)>0:
+                    print(localUrl)
+                    _download(localUrl, pdf_filename)
+                    if _is_valid_file(pdf_filename, "pdf"):
+                        localJson["has_valid_pdf"] = True
 
         # GROBIDification if PDF available 
         if not localJson["has_valid_tei"]:
@@ -516,13 +616,14 @@ class Harverster(object):
         if not localJson["has_valid_thumbnail"] and self.thumbnail:
             if localJson["has_valid_pdf"]:
                 generate_thumbnail(pdf_filename)
-                if _is_valid_file(tei_filename, "png"):
+                if _is_valid_file(pdf_filename.replace('.pdf', '-thumb-small.png'), "png"):
                     localJson["has_valid_thumbnail"] = True
 
         # write the consolidated metadata in the working data directory 
         with open(os.path.join(self.config["data_path"],identifier+".json"), "w") as file_out:
             jsonStr = json.dumps(localJson, sort_keys=True)
             file_out.write(jsonStr)
+
         # and in the entry lmdb for the final dump (avoid retrieving the article metadata over S3 if set)
         with self.env_entries.begin(write=True) as txn2:
             txn2.put(identifier.encode(encoding='UTF-8'), _serialize_pickle(localJson))  
@@ -743,6 +844,14 @@ def _is_valid_file(file, mime_type):
         file_type = magic.from_file(file, mime=True)
     return file_type in target_mime
 
+def _initProcessStateInformation(json_entry):
+    # init process information
+    json_entry["has_valid_pdf"] = False
+    json_entry["has_valid_oa_url"] = False
+    json_entry["has_valid_tei"] = False
+    json_entry["has_valid_ref_annotation"] = False
+    json_entry["has_valid_thumbnail"] = False
+
 def _biblio_glutton_url(biblio_glutton_base, biblio_glutton_port):
     if biblio_glutton_base.endswith("/"):
         res = biblio_glutton_base[:-1]
@@ -875,6 +984,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "COVIDataset harvester")
     parser.add_argument("--dois", default=None, help="path to a file describing a dataset articles as a simple list of DOI (one per line)") 
     parser.add_argument("--cord19", default=None, help="path to the csv file describing the CORD-19 dataset articles") 
+    parser.add_argument("--pmids", default=None, help="path to a file describing a dataset articles as a simple list of PMID (one per line)") 
+    parser.add_argument("--pmcids", default=None, help="path to a file describing a dataset articles as a simple list of PMC ID (one per line)") 
     parser.add_argument("--config", default="./config.json", help="path to the config file, default is ./config.json") 
     parser.add_argument("--reset", action="store_true", help="ignore previous processing states, and re-init the harvesting process from the beginning") 
     parser.add_argument("--reprocess", action="store_true", help="reprocessed existing failed entries") 
@@ -886,6 +997,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     dois_path = args.dois
+    pmids_path = args.pmids
+    pmcids_path = args.pmcids
     csv_path = args.cord19
     config_path = args.config
     reset = args.reset
@@ -917,6 +1030,16 @@ if __name__ == "__main__":
             print("error: the indicated DOI file path is not valid:", dois_path)
             sys.exit(0)    
         harvester.harvest_dois(dois_path)
+    elif pmids_path:    
+        if not os.path.isfile(pmids_path):
+            print("error: the indicated PMID file path is not valid:", pmids_path)
+            sys.exit(0)    
+        harvester.harvest_pmids(pmids_path)
+    elif pmcids_path:    
+        if not os.path.isfile(pmcids_path):
+            print("error: the indicated PMC ID file path is not valid:", pmcids_path)
+            sys.exit(0)    
+        harvester.harvest_pmcids(pmcids_path)
 
     harvester.diagnostic()
 
