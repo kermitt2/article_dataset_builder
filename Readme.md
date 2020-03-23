@@ -2,14 +2,14 @@
 
 Python utility for harvesting efficiently a large Open Access collection of PDF (fault tolerant, can be resumed, parallel download and ingestion) and for transforming them into structured XML adapted to text mining and information retrieval applications.
 
-Currently supported:
+Input currently supported:
 
 - list of DOI in a file, one DOI per line
 - metadata csv input file from [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research)
 
 ## What:
 
-- Perform some metadata enrichment/agregation via [biblio-glutton](https://github.com/kermitt2/biblio-glutton) & CrossRef web API](https://github.com/CrossRef/rest-api-doc) and output consolidated metadata in a json file 
+- Perform some metadata enrichment/agregation via [biblio-glutton](https://github.com/kermitt2/biblio-glutton) & [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and output consolidated metadata in a json file 
 
 - Harvest PDF from the specification of the article set (list of strong identifiers or basic metadata provided in a csv file), typically PDF available in Open Access PDF via the [Unpaywall API](https://unpaywall.org/products/api) (and some heuristics) 
 
@@ -17,11 +17,11 @@ Currently supported:
 
 Optionally: 
 
-- generate thumbnails for article (based on the first page of the PDF) 
+- Generate thumbnails for article (based on the first page of the PDF) 
 
-- upload the generated dataset on S3 instead of the local file system
+- Upload the generated dataset on S3 instead of the local file system
 
-- generate json PDF annotations (with coordinates) for inline reference markers and bibliographical references 
+- Generate json PDF annotations (with coordinates) for inline reference markers and bibliographical references (see [here](https://grobid.readthedocs.io/en/latest/Grobid-service/#apireferenceannotations))
 
 ## Requirements
 
@@ -36,7 +36,7 @@ The following tools need to be installed and running, with access information sp
 
 - [biblio-glutton](https://github.com/kermitt2/biblio-glutton)
 
-It is possible to use the public demo instance of [biblio-glutton](https://github.com/kermitt2/biblio-glutton), as default configured in the `config.json` file (the tool scale at more than 6000 queries per second). However for [Grobid](https://github.com/kermitt2/grobid) we strongly recommand to install a local instance, because the online public demo will not be able to scale and won't be reliable given that it is more or less always overloaded. 
+It is possible to use the public demo instance of [biblio-glutton](https://github.com/kermitt2/biblio-glutton), as default configured in the `config.json` file (the tool scale at more than 6000 queries per second). However for [Grobid](https://github.com/kermitt2/grobid), we strongly recommand to install a local instance, because the online public demo will not be able to scale and won't be reliable given that it is more or less always overloaded. 
 
 As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and [Unpaywall API](https://unpaywall.org/products/api) services are used to cover the gap. For these two services, you need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. 
 
