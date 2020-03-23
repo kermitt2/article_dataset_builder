@@ -23,6 +23,11 @@ Optionally:
 
 - generate json PDF annotations (with coordinates) for inline reference markers and bibliographical references 
 
+## Requirements
+
+The utility has been tested with Python 3.5+. It is developed for a deployment on a POSIX/Linux server (it uses `imagemagick` as external process to generate thumbnails and `wget`). An S3 account and bucket must have been created for non-local storage of the data collection. 
+
+
 ## Installation
 
 The following tools need to be installed and running, with access information specified in the configuration file (`config.json`):
@@ -31,7 +36,7 @@ The following tools need to be installed and running, with access information sp
 
 - [biblio-glutton](https://github.com/kermitt2/biblio-glutton)
 
-It is possible to use public demo instances of these services, but the process will not be able to scale and won't be reliable given that the public servers are very frequently overloaded. 
+It is possible to use the public demo instance of [biblio-glutton](https://github.com/kermitt2/biblio-glutton), as default configured in the `config.json` file (the tool scale at more than 6000 queries per second). However for [Grobid](https://github.com/kermitt2/grobid) we strongly recommand to install a local instance, because the online public demo will not be able to scale and won't be reliable given that it is more or less always overloaded. 
 
 As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and [Unpaywall API](https://unpaywall.org/products/api) services are used to cover the gap. For these two services, you need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. 
 
@@ -119,3 +124,19 @@ Optional additional files:
 The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file.
 
 
+
+## Troubleshooting with imagemagick
+
+Recent update (end of October 2018) of imagemagick is breaking the normal conversion usage. Basically the converter does not convert by default for security reason related to server usage. For non-server mode as involved in our module, it is not a problem to allow PDF conversion. For this, simply edit the file 
+` /etc/ImageMagick-6/policy.xml` and put into comment the following line: 
+
+```
+<!-- <policy domain="coder" rights="none" pattern="PDF" /> -->
+```
+
+
+## License and contact
+
+Distributed under [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0). The dependencies used in the project are either themselves also distributed under Apache 2.0 license or distributed under a compatible license. 
+
+Main author and contact: Patrice Lopez (<patrice.lopez@science-miner.com>)
