@@ -137,8 +137,7 @@ The UUID identifier for a particular article is given in the generated `consolid
 
 ## Troubleshooting with imagemagick
 
-Recent update (end of October 2018) of imagemagick is breaking the normal conversion usage. Basically the converter does not convert by default for security reason related to server usage. For non-server mode as involved in our module, it is not a problem to allow PDF conversion. For this, simply edit the file 
-` /etc/ImageMagick-6/policy.xml` and put into comment the following line: 
+Recent update (end of October 2018) of imagemagick is breaking the normal conversion usage. Basically the converter does not convert by default for security reason related to server usage. For non-server mode as involved in our module, it is not a problem to allow PDF conversion. For this, simply edit the file `/etc/ImageMagick-6/policy.xml` (or `/etc/ImageMagick/policy.xml`) and put into comment the following line: 
 
 ```
 <!-- <policy domain="coder" rights="none" pattern="PDF" /> -->
