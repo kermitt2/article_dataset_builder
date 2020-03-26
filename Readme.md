@@ -133,7 +133,30 @@ Optional additional files:
 
 The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file.
 
+## Using a local PDF repository for CORD-19
 
+The [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research) includes more than 19k articles corresponding to a set of Elsevier articles on COVID-19 [recently put in Open Access](https://www.elsevier.com/connect/coronavirus-information-center). As Unpaywall does not cover these OA articles (on 23.03.2020 at least), you would need to download first these PDF and indicates to the harvesting tool where the local repository of PDF is located: 
+
+- download the PDF files on the COVID-19 FTP server: 
+
+```bash
+> sftp public@coronacontent.np.elsst.com
+```
+
+Indicate `beat_corona` as password. See the [instruction page](https://www.elsevier.com/connect/coronavirus-information-center#researchers) in case of troubles. 
+
+```bash
+> cd pdf
+> mget *
+```
+
+- indicate the local repository where you have downloaded the dataset in the `config.json` file:
+
+```json
+"cord19_elsevier_pdf_path": "/the/path/to/the/pdf"
+```
+
+That's it. The file `./elsevier_covid_map_23_03_2020.csv.gz` contains a map of DOI and PII (the Elsevier article identifiers) for these OA articles. 
 
 ## Troubleshooting with imagemagick
 
