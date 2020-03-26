@@ -12,7 +12,7 @@
     "unpaywall_email": "",
     "hal_base": "https://hal.archives-ouvertes.fr/",
     "istex_base": "",
-    "biblio_glutton_base": "http://cloud.science-miner.com/biblio-glutton/",
+    "biblio_glutton_base": "http://cloud.science-miner.com/glutton",
     "biblio_glutton_port": "",
     "crossref_base": "https://api.crossref.org",
     "crossref_email": "",
