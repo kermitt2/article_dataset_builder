@@ -86,9 +86,9 @@ Similarly for a list of PMID or PMC ID:
 > python3 harvest --dois test/pmids.txt 
 > python3 harvest --dois test/pmcids.txt 
 
-For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can directly use the [source_metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-13/all_sources_metadata_2020-03-13.csv) file by running: 
+For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-20/metadata.csv) file by running: 
 
-> python3 harvest --cord19 all_sources_metadata_2020-03-13.csv  
+> python3 harvest --cord19 metadata.csv  
 
 This will generate a consolidated metadata file (specified by `--out`,  or `consolidated_metadata.json` by default), upload full text files, 
 converted tei.xml files and other optional files either in the local file system (under data_path indicated in the config.json 
@@ -96,7 +96,7 @@ file) or on a S3 bucket if the fields are filled in config.json.
 
 You can set a specific config file name with `--config` :
 
-> python3 harvest --cord19 all_sources_metadata_2020-03-13.csv --config my_config_file.json    
+> python3 harvest --cord19 metadata.csv --config my_config_file.json    
 
 To resume an interrupted processing, simply re-run the same command. 
 
@@ -106,7 +106,7 @@ To re-process the failed articles of an harvesting, use:
 
 To reset entirely an existing harvesting and re-start an harvesting from zero:
 
-> python3 harvest.py --cord19 ../COVIDataSet/resources/all_sources_metadata_2020-03-13.csv --reset
+> python3 harvest.py --cord19 metadata.csv --reset
 
 To create a dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing):
 

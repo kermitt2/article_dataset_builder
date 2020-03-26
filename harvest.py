@@ -58,6 +58,10 @@ class Harverster(object):
         if self.config["bucket_name"] is not None and len(self.config["bucket_name"]) is not 0:
             self.s3 = S3.S3(self.config)
 
+        # in case we use a local folder filled with Elsevier COVID-19 Open Access PDF from their ftp server
+        self.elsevier_oa_map = None
+        self._init_local_file_map()
+
         # standard lmdb environment for storing biblio entries by uuid
         self.env_entries = None
 
@@ -81,6 +85,20 @@ class Harverster(object):
             print('GROBID server does not appear up and running ' + str(r.status_code))
         else:
             print("GROBID server is up and running")
+
+    def _init_local_file_map(self):
+        # build the local file map, if any
+        if self.config["cord19_elsevier_pdf_path"] is not None and len(self.config["cord19_elsevier_pdf_path"])>0  and self.elsevier_oa_map is None:
+            # init map
+            self.elsevier_oa_map = {}
+            if os.path.isfile("./elsevier_covid_map_23_03_2020.csv.gz"):
+                with gzip.open("./elsevier_covid_map_23_03_2020.csv.gz", mode="rt") as csv_file:
+                    csv_reader = csv.DictReader(csv_file)
+                    for row in csv_reader:
+                        if row["doi"] is not None and len(row["doi"])>0:
+                            self.elsevier_oa_map[row["doi"].lower()] = row["pdf"]
+                        if row["pii"] is not None and len(row["pii"])>0:    
+                            self.elsevier_oa_map[row["pii"]] = row["pdf"]
 
     def _init_lmdb(self):
         # create the data path if it does not exist 
@@ -120,6 +138,35 @@ class Harverster(object):
             if other_oa_location['url_for_pdf']:
                 return other_oa_location['url_for_pdf']
         return None
+
+    def elsevier_oa_check(self, doi=None, pii=None):
+        # this is a list of OA articles from Elsevier, e.g. COVID papers, if successful it will return the path
+        # to the local PDF corresponding to this article
+        # we can download these pdf set from their dedicated ftp, and make them available locally for this dataset builder
+        # note: also direct download link for pdf - but maybe some risks to be blocked?
+        # https://www.sciencedirect.com/science/article/pii/S0924857920300674/pdfft?isDTMRedir=true&download=true
+        # their API is not even up to date: https://api.elsevier.com/content/article/pii/S0924857920300674
+        # still described as closed access
+        if self.elsevier_oa_map is None:
+            return None
+
+        if doi is None and pii is None:
+            return None
+
+        if self.config["cord19_elsevier_pdf_path"] is None or len(self.config["cord19_elsevier_pdf_path"]) == 0:
+            return None
+
+        '''
+        if doi is not None:
+            print(doi)
+            if doi.lower() in self.elsevier_oa_map:
+                print(self.elsevier_oa_map[doi.lower()])
+        '''
+        if doi is not None and doi.lower() in self.elsevier_oa_map:
+            return os.path.join(self.config["cord19_elsevier_pdf_path"],self.elsevier_oa_map[doi.lower()])
+
+        if pii is not None and pii in self.elsevier_oa_map:
+            return os.path.join(self.config["cord19_elsevier_pdf_path"],self.elsevier_oa_map[pii])
 
     def biblio_glutton_lookup(self, doi=None, pmcid=None, pmid=None, istex_id=None, istex_ark=None):
         """
@@ -360,7 +407,7 @@ class Harverster(object):
 
             print("processed", str(line_count), "articles")
 
-    def harvest_csv(self, metadata_csv_file):
+    def harvest_cord19(self, metadata_csv_file):
         with open(metadata_csv_file, mode='r') as csv_file:
             csv_reader = csv.DictReader(csv_file)
             line_count = 0 # total count of articles
@@ -382,8 +429,14 @@ class Harverster(object):
                     rows = []
 
                 # check if the entry has already been processed
-                if self.getUUIDByStrongIdentifier(row["sha"]) is not None:
-                    continue
+                # if a sha is available we use that as CORD-19 entry identifier, however in the version releases on March 21st 2020
+                # a sha is not always present, so we use the DOI as fallback
+                if row["sha"] and len(row["sha"])>0:
+                    if self.getUUIDByStrongIdentifier(row["sha"]) is not None:
+                        continue
+                elif row["doi"] and len(row["doi"])>0:
+                    if self.getUUIDByStrongIdentifier(row["doi"]) is not None:
+                        continue
 
                 # we need a new identifier
                 identifier = str(uuid.uuid4())
@@ -517,7 +570,7 @@ class Harverster(object):
         self.processTask(localJson)
             
     def processEntryCord19(self, identifier, row):
-        # sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,WHO #Covidence,has_full_text
+        # sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,WHO #Covidence,has_full_text,full_text_file
         localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
         if localJson is None:
             localJson = {}
@@ -537,8 +590,9 @@ class Harverster(object):
         
         if 'DOI' not in localJson and row["doi"] is not none and len(row["doi"])>0:
             localJson['DOI'] = row["doi"]
-
-        print("processing", localJson['DOI'], "as", identifier)
+        
+        if 'DOI' in localJson:
+            print("processing", localJson['DOI'], "as", identifier)
 
         # add possible missing information in the metadata entry
         if row["pmcid"] is not None and len(row["pmcid"])>0 and 'pmcid' not in localJson:
@@ -549,8 +603,9 @@ class Harverster(object):
         _initProcessStateInformation(localJson)
 
         # update uuid lookup map
-        with self.env_uuid.begin(write=True) as txn_uuid:
-            txn_uuid.put(row["sha"].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
+        if row["sha"] and len(row["sha"])>0:
+            with self.env_uuid.begin(write=True) as txn_uuid:
+                txn_uuid.put(row["sha"].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
 
         self.updateIdentifierMap(localJson)
         self.processTask(localJson)
@@ -572,11 +627,25 @@ class Harverster(object):
         # call Unpaywall
         localUrl = None
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
-            try:
-                localUrl = self.unpaywalling_doi(localJson['DOI'])
-            except:
-                print("Unpaywall API call not succesful")   
-                pass
+            # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
+            # obtained from the Elsevier COVID-19 ftp
+            if "pii" in localJson:
+                local_pii = localJson['pii']
+            else:
+                local_pii = None
+            if "DOI" in localJson:
+                local_doi = localJson['DOI'].lower() 
+            else:
+                local_doi = None
+            local_elsevier = self.elsevier_oa_check(doi=local_doi,pii=local_pii)
+            if local_elsevier is not None and os.path.isfile(local_elsevier):
+                localUrl = "file://" + local_elsevier
+            else:
+                try:
+                    localUrl = self.unpaywalling_doi(localJson['DOI'])
+                except:
+                    print("Unpaywall API call not succesful")   
+                    pass
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
                     # we can try to use the OA link from bibilio-glutton as fallback (though not very optimistic on this!)
@@ -587,14 +656,19 @@ class Harverster(object):
             if localUrl is not None and len(localUrl)>0:
                 localJson["has_valid_oa_url"] = True
 
+        if "oaLink" in localJson:
+            print(localJson["oaLink"])
+
         # let's try to get this damn PDF
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
         if not localJson["has_valid_pdf"] or not localJson["has_valid_tei"] or (self.thumbnail and not localJson["has_valid_thumbnail"]):
             if "oaLink" in localJson:
                 localUrl = localJson["oaLink"]
                 if localUrl is not None and len(localUrl)>0:
-                    print(localUrl)
-                    _download(localUrl, pdf_filename)
+                    if localUrl.startswith("file://") and os.path.isfile(localUrl.replace("file://","")):
+                        shutil.copyfile(localUrl.replace("file://",""), pdf_filename)
+                    else:
+                        _download(localUrl, pdf_filename)
                     if _is_valid_file(pdf_filename, "pdf"):
                         localJson["has_valid_pdf"] = True
 
@@ -653,7 +727,7 @@ class Harverster(object):
             # upload to S3 
             # upload is already in parallel for individual file (with parts)
             # so we don't further upload in parallel at the level of the files
-            if os.path.isfile(local_filename_pdf):
+            if os.path.isfile(local_filename_pdf) and _is_valid_file(local_filename_pdf, "pdf"):
                 self.s3.upload_file_to_s3(local_filename_pdf, dest_path, storage_class='ONEZONE_IA')
             if os.path.isfile(local_filename_nxml):
                 self.s3.upload_file_to_s3(local_filename_nxml, dest_path, storage_class='ONEZONE_IA')
@@ -678,7 +752,7 @@ class Harverster(object):
             try:
                 local_dest_path = os.path.join(self.config["data_path"], dest_path)
                 os.makedirs(os.path.dirname(local_dest_path), exist_ok=True)
-                if os.path.isfile(local_filename_pdf):
+                if os.path.isfile(local_filename_pdf) and _is_valid_file(local_filename_pdf, "pdf"):
                     shutil.copyfile(local_filename_pdf, os.path.join(local_dest_path, local_entry['id']+".pdf"))
                 if os.path.isfile(local_filename_nxml):
                     shutil.copyfile(local_filename_nxml, os.path.join(local_dest_path, local_entry['id']+".nxml"))
@@ -999,7 +1073,7 @@ if __name__ == "__main__":
     dois_path = args.dois
     pmids_path = args.pmids
     pmcids_path = args.pmcids
-    csv_path = args.cord19
+    csv_cord19 = args.cord19
     config_path = args.config
     reset = args.reset
     dump_out = args.dump
@@ -1020,11 +1094,11 @@ if __name__ == "__main__":
 
     if reprocess:
         harvester.reprocessFailed()        
-    elif csv_path:
-        if not os.path.isfile(csv_path):
-            print("error: the indicated cvs file path is not valid:", csv_path)
+    elif csv_cord19:
+        if not os.path.isfile(csv_cord19):
+            print("error: the indicated cvs file path is not valid:", csv_cord19)
             sys.exit(0)    
-        harvester.harvest_csv(csv_path)
+        harvester.harvest_cord19(csv_cord19)
     elif dois_path:    
         if not os.path.isfile(dois_path):
             print("error: the indicated DOI file path is not valid:", dois_path)
