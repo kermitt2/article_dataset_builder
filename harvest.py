@@ -40,7 +40,7 @@ class Harverster(object):
     Usage: see the Readme.md file
     """
 
-    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=None, annotation=False):
+    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False):
         self.config = None   
         self._load_config(config_path)
 
@@ -76,6 +76,8 @@ class Harverster(object):
         self.env_uuid = None
 
         self._init_lmdb()
+
+        self.dump_file_name = "consolidated_metadata.json"
 
     def _load_config(self, path='./config.json'):
         """
@@ -277,7 +279,7 @@ class Harverster(object):
         
         return jsonResult
 
-    def reset(self, dump_file=None):
+    def reset(self, dump_file=False):
         """
         Remove the local files and lmdb keeping track of the state of advancement of the harvesting and
         of the failed entries
@@ -300,17 +302,16 @@ class Harverster(object):
                     print("Error: %s - %s." % (e.filename, e.strerror))
 
         # clean the metadata file if present
-        if self.dump_file is None:
-            self.dump_file = "consolidated_metadata.json" 
-        if os.path.isfile(self.dump_file):
-            os.remove(self.dump_file)
+        if self.dump_file: 
+            if os.path.isfile(self.dump_file_name):
+                os.remove(self.dump_file_name)
 
         # re-init the environments
         self._init_lmdb()
 
     def dump_metadata(self):
-        if self.dump_file is None:
-            self.dump_file = "consolidated_metadata.json"
+        if self.dump_file_name is None:
+            self.dump_file_name = "consolidated_metadata.json"
 
         # init lmdb transactions
         txn = self.env_entries.begin(write=True)
@@ -318,7 +319,7 @@ class Harverster(object):
         nb_total = txn.stat()['entries']
         print("number of harvested entries:", nb_total)
 
-        with open(self.dump_file,'w') as file_out:
+        with open(self.dump_file_name,'w') as file_out:
             # iterate over lmdb
             cursor = txn.cursor()
             for key, value in cursor:
@@ -330,8 +331,8 @@ class Harverster(object):
 
         # we need to upload to S3 the consolidated metadata file, if S3 has been set
         if self.s3 is not None:
-            if os.path.isfile(self.dump_file):
-                self.s3.upload_file_to_s3(self.dump_file, ".", storage_class='ONEZONE_IA')
+            if os.path.isfile(self.dump_file_name):
+                self.s3.upload_file_to_s3(self.dump_file_name, ".", storage_class='ONEZONE_IA')
 
 
     def run_grobid(self, pdf_file, output=None, annotation_output=None):
@@ -1131,7 +1132,7 @@ if __name__ == "__main__":
     parser.add_argument("--thumbnail", action="store_true", help="generate thumbnail files for the front page of the harvested PDF") 
     parser.add_argument("--annotation", action="store_true", help="generate bibliographical annotations with coordinates for the harvested PDF") 
     #parser.add_argument("--sample", type=int, default=None, help="harvest only a random sample of indicated size")
-    parser.add_argument("--dump", default="./consolidated_metadata.json", help="write all the consolidated metadata in json") 
+    parser.add_argument("--dump", action="store_true", help="write all the consolidated metadata in json in the file consolidated_metadata.json") 
 
     args = parser.parse_args()
 
@@ -1141,17 +1142,17 @@ if __name__ == "__main__":
     csv_cord19 = args.cord19
     config_path = args.config
     reset = args.reset
-    dump_out = args.dump
+    dump = args.dump
     thumbnail = args.thumbnail
     annotation = args.annotation
     reprocess = args.reprocess
     #sample = args.sample
 
-    harvester = Harverster(config_path=config_path, thumbnail=thumbnail, sample=None, dump_metadata=dump_out, annotation=annotation)
+    harvester = Harverster(config_path=config_path, thumbnail=thumbnail, sample=None, dump_metadata=dump, annotation=annotation)
 
     if reset:
         if input("You asked to reset the existing harvesting, this will removed all the already downloaded data files... are you sure? (y/n) ") == "y":
-            harvester.reset()
+            harvester.reset(True)
         else:
             print("skipping reset...")
 
@@ -1182,7 +1183,7 @@ if __name__ == "__main__":
 
     harvester.diagnostic()
 
-    if dump_out is not None:
+    if dump :
         harvester.dump_metadata()
 
     runtime = round(time.time() - start_time, 3)
