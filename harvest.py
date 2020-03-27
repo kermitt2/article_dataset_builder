@@ -286,14 +286,6 @@ class Harverster(object):
         self.env_entries.close()
         self.env_uuid.close()
 
-        '''
-        envFilePath = os.path.join(self.config["data_path"], 'entries')
-        shutil.rmtree(envFilePath)
-
-        envFilePath = os.path.join(self.config["data_path"], 'uuid')
-        shutil.rmtree(envFilePath)
-        '''
-
         # clean any possibly remaining tmp files
         for f in os.listdir(self.config["data_path"]):
             if f.endswith(".pdf") or f.endswith(".png") or f.endswith(".nxml") or f.endswith(".xml") or f.endswith(".tar.gz") or f.endswith(".json"):
