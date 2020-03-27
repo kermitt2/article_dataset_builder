@@ -85,20 +85,28 @@ optional arguments:
 
 Fill the file `config.json` with relevant service and parameter url, then install the python mess:
 
-> pip3 install -f requirements
+```console
+pip3 install -f requirements
+```
 
 For instance to process a list of DOI (one DOI per line):
 
-> python3 harvest --dois test/dois.txt 
+```console
+python3 harvest --dois test/dois.txt 
+```
 
 Similarly for a list of PMID or PMC ID:
 
-> python3 harvest --dois test/pmids.txt 
-> python3 harvest --dois test/pmcids.txt 
+```console
+python3 harvest --dois test/pmids.txt 
+python3 harvest --dois test/pmcids.txt 
+```
 
 For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-20/metadata.csv) file by running: 
 
-> python3 harvest --cord19 metadata.csv  
+```console
+python3 harvest --cord19 metadata.csv  
+```
 
 This will generate a consolidated metadata file (specified by `--out`,  or `consolidated_metadata.json` by default), upload full text files, 
 converted tei.xml files and other optional files either in the local file system (under data_path indicated in the config.json 
@@ -106,22 +114,29 @@ file) or on a S3 bucket if the fields are filled in config.json.
 
 You can set a specific config file name with `--config` :
 
-> python3 harvest --cord19 metadata.csv --config my_config_file.json    
+```console
+python3 harvest --cord19 metadata.csv --config my_config_file.json    
+```
 
 To resume an interrupted processing, simply re-run the same command. 
 
 To re-process the failed articles of an harvesting, use:
 
-> python3 harvest.py --reprocess 
+```console
+python3 harvest.py --reprocess 
+```
 
 To reset entirely an existing harvesting and re-start an harvesting from zero:
 
-> python3 harvest.py --cord19 metadata.csv --reset
+```console
+python3 harvest.py --cord19 metadata.csv --reset
+```
 
 To create a dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing):
 
-> python3 harvest.py --dump consolidated_metadata.json
-
+```console
+python3 harvest.py --dump consolidated_metadata.json
+```
 
 ## Generated files
 
@@ -146,46 +161,21 @@ The UUID identifier for a particular article is given in the generated `consolid
 
 The `*.nxml` files correspond to the JATS files available for PMC (Open Access set only).
 
-## Converting the PMC XML JATS files into XML TEI
-
-After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is normally no loss of information from the JATS file.  
-
-To launch the conversion:
-
-
-```bash
-> python3 nlm2tei.py
-```
-
-If a custom config file is used:
-
-```bash
-> python3 nlm2tei.py --config ./my_config.json
-```
-
-This will apply Pub2TEI (a set of XSLT) to all the harvested `*.nxml` files and add to the document repository a new file TEI file:
-
-```
-98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pub2tei.tei.xml
-```
-
-Note that Pub2TEI supports a lot of other publisher's XML formats, so the principle could be extended to transform a lot of different XML formats into a single one (TEI), facilitating further ingestion and process by avoiding to write complicated XML parsers for each case. 
-
 ## Using a local PDF repository for CORD-19
 
 The [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research) includes more than 19k articles corresponding to a set of Elsevier articles on COVID-19 [recently put in Open Access](https://www.elsevier.com/connect/coronavirus-information-center). As Unpaywall does not cover these OA articles (on 23.03.2020 at least), you would need to download first these PDF and indicates to the harvesting tool where the local repository of PDF is located: 
 
 - download the PDF files on the COVID-19 FTP server: 
 
-```bash
-> sftp public@coronacontent.np.elsst.com
+```console
+sftp public@coronacontent.np.elsst.com
 ```
 
 Indicate `beat_corona` as password. See the [instruction page](https://www.elsevier.com/connect/coronavirus-information-center#researchers) in case of troubles. 
 
-```bash
-> cd pdf
-> mget *
+```console
+cd pdf
+mget *
 ```
 
 - indicate the local repository where you have downloaded the dataset in the `config.json` file:
@@ -196,6 +186,31 @@ Indicate `beat_corona` as password. See the [instruction page](https://www.elsev
 
 That's it. The file `./elsevier_covid_map_23_03_2020.csv.gz` contains a map of DOI and PII (the Elsevier article identifiers) for these OA articles. 
 
+## Converting the PMC XML JATS files into XML TEI
+
+After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is normally no loss of information from the JATS file.  
+
+To launch the conversion:
+
+
+```console
+python3 nlm2tei.py
+```
+
+If a custom config file is used:
+
+```console
+python3 nlm2tei.py --config ./my_config.json
+```
+
+This will apply Pub2TEI (a set of XSLT) to all the harvested `*.nxml` files and add to the document repository a new file TEI file:
+
+```
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pub2tei.tei.xml
+```
+
+Note that Pub2TEI supports a lot of other publisher's XML formats, so the principle could be extended to transform a lot of different XML formats into a single one (TEI), facilitating further ingestion and process by avoiding to write complicated XML parsers for each case. 
+
 ## Troubleshooting with imagemagick
 
 Recent update (end of October 2018) of imagemagick is breaking the normal conversion usage. Basically the converter does not convert by default for security reason related to server usage. For non-server mode as involved in our module, it is not a problem to allow PDF conversion. For this, simply edit the file `/etc/ImageMagick-6/policy.xml` (or `/etc/ImageMagick/policy.xml`) and put into comment the following line: 
@@ -203,7 +218,6 @@ Recent update (end of October 2018) of imagemagick is breaking the normal conver
 ```
 <!-- <policy domain="coder" rights="none" pattern="PDF" /> -->
 ```
-
 
 ## License and contact
 
