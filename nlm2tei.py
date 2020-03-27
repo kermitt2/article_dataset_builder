@@ -18,6 +18,10 @@ class Nlm2tei(object):
         self.config = None   
         self._load_config(config_path)
 
+        self.s3 = None
+        if self.config["bucket_name"] is not None and len(self.config["bucket_name"]) is not 0:
+            self.s3 = S3.S3(self.config)
+
     def _load_config(self, path='./config.json'):
         """
         Load the json configuration 
@@ -112,18 +116,20 @@ class Nlm2tei(object):
         for f in os.listdir(temp_dir_out):
             if f.endswith(".nxml.xml"):
                 # move the file back to its storage location (which can be S3)
-                print(f)
                 identifier = f.split(".")[0]
-                print(identifier)
-                dest_path = os.path.join(self.config["data_path"], generateStoragePath(identifier), identifier+".pub2tei.tei.xml")
-                print(dest_path)
-                shutil.copyfile(os.path.join(temp_dir_out,f), dest_path)
-        '''
+                if self.s3 is not None:
+                    # upload results on S3 bucket
+                    self.s3.upload_file_to_s3(identifier+".pub2tei.tei.xml", generateStoragePath(identifier), storage_class='ONEZONE_IA')
+                else:   
+                    dest_path = os.path.join(self.config["data_path"], generateStoragePath(identifier), identifier+".pub2tei.tei.xml")
+                    shutil.copyfile(os.path.join(temp_dir_out,f), dest_path)
+        
+        # clean temp dir
         try:
             shutil.rmtree(temp_dir)
         except OSError as e:
             print("Error: %s - %s." % (e.filename, e.strerror))
-        '''
+        
 
     def process(self):
         """
@@ -134,7 +140,7 @@ class Nlm2tei(object):
         self.process_batch(temp_dir)
         self._manage_batch_results(temp_dir)  
         runtime = round(time.time() - start_time, 3)
-        print("runtime: %s seconds " % (runtime))
+        print("\nruntime: %s seconds " % (runtime))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "COVIDataset harvester")

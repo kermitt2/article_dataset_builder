@@ -18,11 +18,13 @@ To do:
 
 - Harvest PDF from the specification of the article set (list of strong identifiers or basic metadata provided in a csv file), typically PDF available in Open Access PDF via the [Unpaywall API](https://unpaywall.org/products/api) (and some heuristics) 
 
-- Perform [Grobid](https://github.com/kermitt2/grobid) full processing of PDF (including bibliographical reference consolidation and OA access resolution of the cited references)
+- Perform [Grobid](https://github.com/kermitt2/grobid) full processing of PDF (including bibliographical reference consolidation and OA access resolution of the cited references), converting them into structured XML TEI
+
+- For PMC files (Open Access set only), harvest also XML JATS (NLM) files and perform a conversion into XML TEI (same TEI customization as Grobid) via [Pub2TEI](https://github.com/kermitt2/Pub2TEI)
 
 Optionally: 
 
-- Generate thumbnails for article (based on the first page of the PDF) 
+- Generate thumbnails for article (based on the first page of the PDF), small/medium/large 
 
 - Upload the generated dataset on S3 instead of the local file system
 
@@ -37,15 +39,23 @@ The utility has been tested with Python 3.5+. It is developed for a deployment o
 
 The following tools need to be installed and running, with access information specified in the configuration file (`config.json`):
 
-- [Grobid](https://github.com/kermitt2/grobid)
+- [Grobid](https://github.com/kermitt2/grobid), for converting PDF into XML TEI
 
-- [biblio-glutton](https://github.com/kermitt2/biblio-glutton)
+- [biblio-glutton](https://github.com/kermitt2/biblio-glutton), for metadata retrieval and aggregation
 
-It is possible to use the public demo instance of [biblio-glutton](https://github.com/kermitt2/biblio-glutton), as default configured in the `config.json` file (the tool scale at more than 6000 queries per second). However for [Grobid](https://github.com/kermitt2/grobid), we strongly recommand to install a local instance, because the online public demo will not be able to scale and won't be reliable given that it is more or less always overloaded. 
+- [Pub2TEI](https://github.com/kermitt2/Pub2TEI), for converting PMC XML files into XML TEI
+
+It should be possible to use the public demo instance of [biblio-glutton](https://github.com/kermitt2/biblio-glutton), as default configured in the `config.json` file (the tool scale at more than 6000 queries per second). However for [Grobid](https://github.com/kermitt2/grobid), we strongly recommand to install a local instance, because the online public demo will not be able to scale and won't be reliable given that it is more or less always overloaded. 
 
 As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and [Unpaywall API](https://unpaywall.org/products/api) services are used to cover the gap. For these two services, you need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. 
 
 An important parameter in the `config.json` file is the number of parallel document processing that is allowed, this is specified by the attribute `batch_size`, default value being `10` (so 10 documents max downloaded in parallel with distinct threads/workers and processed by Grobid in parallel). You can set this number according to your available number of threads.   
+
+These tools requires Java 8 or more. 
+
+## Docker
+
+TBD
 
 ## Usage
 
@@ -119,12 +129,13 @@ Structure of the generated files for an article having as UUID identifier `98da1
 
 ```
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pdf
-98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.tei.xml
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.grobid.tei.xml
 ```
 
 Optional additional files:
 
 ```
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.nxml
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-ref-annotations.json
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-small.png
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-medium.png
@@ -132,6 +143,33 @@ Optional additional files:
 ```
 
 The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file.
+
+The `*.nxml` files correspond to the JATS files available for PMC (Open Access set only).
+
+## Converting the PMC XML JATS files into XML TEI
+
+After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is normally no loss of information from the JATS file.  
+
+To launch the conversion:
+
+
+```bash
+> python3 nlm2tei.py
+```
+
+If a custom config file is used:
+
+```bash
+> python3 nlm2tei.py --config ./my_config.json
+```
+
+This will apply Pub2TEI (a set of XSLT) to all the harvested `*.nxml` files and add to the document repository a new file TEI file:
+
+```
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pub2tei.tei.xml
+```
+
+Note that Pub2TEI supports a lot of other publisher's XML formats, so the principle could be extended to transform a lot of different XML formats into a single one (TEI), facilitating further ingestion and process by avoiding to write complicated XML parsers for each case. 
 
 ## Using a local PDF repository for CORD-19
 
