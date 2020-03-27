@@ -18,5 +18,6 @@
     "crossref_email": "",
     "grobid_base": "localhost",
     "grobid_port": "8070",
-    "cord19_elsevier_pdf_path": ""
+    "cord19_elsevier_pdf_path": "",
+    "pub2tei_path": ""
 }

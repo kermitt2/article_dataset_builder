@@ -20,6 +20,7 @@ import csv
 import time
 import uuid
 import lmdb
+from tqdm import tqdm
 
 map_size = 100 * 1024 * 1024 * 1024 
 
@@ -43,6 +44,9 @@ class Harverster(object):
         self.config = None   
         self._load_config(config_path)
 
+        # here are store stable resources like identifier mapping and archive download mapping
+        self.resource_path = "./resources"
+
         # the file where all the metadata are stored
         self.dump_file = dump_metadata
 
@@ -61,6 +65,9 @@ class Harverster(object):
         # in case we use a local folder filled with Elsevier COVID-19 Open Access PDF from their ftp server
         self.elsevier_oa_map = None
         self._init_local_file_map()
+
+        # the following lmdb map gives for every PMC ID where to download the archive file containing NLM and PDF files
+        self.env_pmc_oa = None
 
         # standard lmdb environment for storing biblio entries by uuid
         self.env_entries = None
@@ -87,12 +94,13 @@ class Harverster(object):
             print("GROBID server is up and running")
 
     def _init_local_file_map(self):
-        # build the local file map, if any
-        if self.config["cord19_elsevier_pdf_path"] is not None and len(self.config["cord19_elsevier_pdf_path"])>0  and self.elsevier_oa_map is None:
+        # build the local file map, if any, for the Elsevier COVID-19 OA set
+        # TBD: this might better go to its own LMDB map than staying in memory like this!
+        if self.config["cord19_elsevier_pdf_path"] is not None and len(self.config["cord19_elsevier_pdf_path"])>0 and self.elsevier_oa_map is None:
             # init map
             self.elsevier_oa_map = {}
-            if os.path.isfile("./elsevier_covid_map_23_03_2020.csv.gz"):
-                with gzip.open("./elsevier_covid_map_23_03_2020.csv.gz", mode="rt") as csv_file:
+            if os.path.isfile(os.path.join(self.resource_path, "elsevier_covid_map_23_03_2020.csv.gz")):
+                with gzip.open(os.path.join(self.resource_path, "elsevier_covid_map_23_03_2020.csv.gz"), mode="rt") as csv_file:
                     csv_reader = csv.DictReader(csv_file)
                     for row in csv_reader:
                         if row["doi"] is not None and len(row["doi"])>0:
@@ -116,6 +124,52 @@ class Harverster(object):
 
         envFilePath = os.path.join(self.config["data_path"], 'uuid')
         self.env_uuid = lmdb.open(envFilePath, map_size=map_size)
+
+        # build the PMC map information, in particular for downloading the archive file containing the PDF and XML 
+        # files (PDF not always present)
+        resource_file = os.path.join(self.resource_path, "oa_file_list.txt")
+        # TBD: if the file is not present we should download it at ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
+        if not os.path.isfile(resource_file):
+            # TBD: if the file is not present we should download it at ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
+            url = "ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt"
+            print("Downloading PMC resource file:", url)
+            _download(url, resource_file)
+
+        envFilePath = os.path.join(self.resource_path, 'pmc_oa')
+        if os.path.isfile(resource_file) and not os.path.isdir(envFilePath):
+            self.env_pmc_oa = lmdb.open(envFilePath, map_size=map_size)
+            txn = self.env_pmc_oa.begin(write=True)
+
+            nb_lines = 0
+            # get number of line in the file
+            with open(resource_file, "r") as fp:
+                for line in fp:
+                    nb_lines += 1
+
+            # fill this lmdb map
+            print("building PMC resource map")
+            with open(resource_file, "r") as fp:
+                count = 0
+                for line in tqdm(fp, total=nb_lines):
+                    if count == 0:
+                        #skip first line which is just a time stamp
+                        count += 1
+                        continue
+                    row = line.split('\t')
+                    subpath = row[0]
+                    pmcid = row[2]
+                    # pmid is optional
+                    pmid= row[3]
+                    license = row[4]
+                    '''
+                    localInfo = {}
+                    localInfo["subpath"] = subpath
+                    localInfo["pmid"] = pmid
+                    localInfo["license"] = license
+                    '''
+                    txn.put(pmcid.encode(encoding='UTF-8'), subpath.encode(encoding='UTF-8'))  
+                    count += 1
+            txn.commit()               
 
     def unpaywalling_doi(self, doi):
         """
@@ -167,6 +221,15 @@ class Harverster(object):
 
         if pii is not None and pii in self.elsevier_oa_map:
             return os.path.join(self.config["cord19_elsevier_pdf_path"],self.elsevier_oa_map[pii])
+
+    def pmc_oa_check(self, pmcid):
+        txn = self.env_pmc_oa.begin()
+        pmc_info = txn.get(pmcid.encode(encoding='UTF-8'))
+        if pmc_info is not None:
+            subpath = pmc_info.decode(encoding='UTF-8');
+            return os.path.join(self.config["pmc_base_ftp"],subpath)
+        else:
+            return None
 
     def biblio_glutton_lookup(self, doi=None, pmcid=None, pmid=None, istex_id=None, istex_ark=None):
         """
@@ -223,18 +286,20 @@ class Harverster(object):
         self.env_entries.close()
         self.env_uuid.close()
 
+        '''
         envFilePath = os.path.join(self.config["data_path"], 'entries')
         shutil.rmtree(envFilePath)
 
         envFilePath = os.path.join(self.config["data_path"], 'uuid')
         shutil.rmtree(envFilePath)
+        '''
 
         # clean any possibly remaining tmp files
         for f in os.listdir(self.config["data_path"]):
             if f.endswith(".pdf") or f.endswith(".png") or f.endswith(".nxml") or f.endswith(".xml") or f.endswith(".tar.gz") or f.endswith(".json"):
                 os.remove(os.path.join(self.config["data_path"], f))
 
-            # clean any existing data files
+            # clean any existing data files, except 
             path = os.path.join(self.config["data_path"], f)
             if os.path.isdir(path):
                 try:
@@ -627,20 +692,26 @@ class Harverster(object):
         # call Unpaywall
         localUrl = None
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
-            # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
-            # obtained from the Elsevier COVID-19 ftp
-            if "pii" in localJson:
-                local_pii = localJson['pii']
-            else:
-                local_pii = None
-            if "DOI" in localJson:
-                local_doi = localJson['DOI'].lower() 
-            else:
-                local_doi = None
-            local_elsevier = self.elsevier_oa_check(doi=local_doi,pii=local_pii)
-            if local_elsevier is not None and os.path.isfile(local_elsevier):
-                localUrl = "file://" + local_elsevier
-            else:
+            # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
+            if "pmcid" in localJson:
+                localUrl = self.pmc_oa_check(pmcid=localJson["pmcid"])
+
+            if localUrl is None:
+                # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
+                # obtained from the Elsevier COVID-19 ftp
+                if "pii" in localJson:
+                    local_pii = localJson['pii']
+                else:
+                    local_pii = None
+                if "DOI" in localJson:
+                    local_doi = localJson['DOI'].lower() 
+                else:
+                    local_doi = None
+                local_elsevier = self.elsevier_oa_check(doi=local_doi,pii=local_pii)
+                if local_elsevier is not None and os.path.isfile(local_elsevier):
+                    localUrl = "file://" + local_elsevier
+
+            if localUrl is None:
                 try:
                     localUrl = self.unpaywalling_doi(localJson['DOI'])
                 except:
@@ -667,6 +738,8 @@ class Harverster(object):
                 if localUrl is not None and len(localUrl)>0:
                     if localUrl.startswith("file://") and os.path.isfile(localUrl.replace("file://","")):
                         shutil.copyfile(localUrl.replace("file://",""), pdf_filename)
+                    if localUrl.endswith(".tar.gz"):
+                        _download(localUrl, os.path.join(self.config["data_path"], identifier+".tar.gz"))
                     else:
                         _download(localUrl, pdf_filename)
                     if _is_valid_file(pdf_filename, "pdf"):
