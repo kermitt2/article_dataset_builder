@@ -60,9 +60,9 @@ TBD
 ## Usage
 
 ```
-usage: harvest.py [-h] [--dois DOIS] [--cord19 CORD19] [--config CONFIG]
-                  [--reset] [--reprocess] [--thumbnail] [--annotation]
-                  [--dump DUMP]
+usage: harvest.py [-h] [--dois DOIS] [--cord19 CORD19] [--pmids PMIDS]
+                  [--pmcids PMCIDS] [--config CONFIG] [--reset] [--reprocess]
+                  [--thumbnail] [--annotation] [--dump]
 
 COVIDataset harvester
 
@@ -72,6 +72,10 @@ optional arguments:
                    list of DOI (one per line)
   --cord19 CORD19  path to the csv file describing the CORD-19 dataset
                    articles
+  --pmids PMIDS    path to a file describing a dataset articles as a simple
+                   list of PMID (one per line)
+  --pmcids PMCIDS  path to a file describing a dataset articles as a simple
+                   list of PMC ID (one per line)
   --config CONFIG  path to the config file, default is ./config.json
   --reset          ignore previous processing states, and re-init the
                    harvesting process from the beginning
@@ -80,7 +84,8 @@ optional arguments:
                    harvested PDF
   --annotation     generate bibliographical annotations with coordinates for
                    the harvested PDF
-  --dump DUMP      write all the consolidated metadata in json
+  --dump           write all the consolidated metadata in json in the file
+                   consolidated_metadata.json
 ```
 
 Fill the file `config.json` with relevant service and parameter url, then install the python mess:
@@ -132,11 +137,13 @@ To reset entirely an existing harvesting and re-start an harvesting from zero:
 python3 harvest.py --cord19 metadata.csv --reset
 ```
 
-To create a dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing):
+To create a dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing), add the parameter `--dump`:
 
 ```console
-python3 harvest.py --dump consolidated_metadata.json
+python3 harvest.py --dump 
 ```
+
+The generated file is named `consolidated_metadata.json`.
 
 ## Generated files
 
