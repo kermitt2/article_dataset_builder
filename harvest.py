@@ -739,7 +739,7 @@ class Harverster(object):
 
         # GROBIDification if PDF available 
         if not localJson["has_valid_tei"]:
-            tei_filename = os.path.join(self.config["data_path"], identifier+".tei.xml")
+            tei_filename = os.path.join(self.config["data_path"], identifier+".grobid.tei.xml")
             annotation_filename = None
             if self.annotation:
                 annotation_filename = os.path.join(self.config["data_path"], identifier+"-ref-annotations.json")
@@ -779,7 +779,7 @@ class Harverster(object):
         """
         local_filename_pdf = os.path.join(self.config["data_path"], local_entry['id']+".pdf")
         local_filename_nxml = os.path.join(self.config["data_path"], local_entry['id']+".nxml")
-        local_filename_tei = os.path.join(self.config["data_path"], local_entry['id']+".tei.xml")
+        local_filename_tei = os.path.join(self.config["data_path"], local_entry['id']+".grobid.tei.xml")
         local_filename_json = os.path.join(self.config["data_path"], local_entry['id']+".json")
         local_filename_ref = os.path.join(self.config["data_path"], local_entry['id']+"-ref-annotations.json")
 
@@ -822,7 +822,7 @@ class Harverster(object):
                 if os.path.isfile(local_filename_nxml):
                     shutil.copyfile(local_filename_nxml, os.path.join(local_dest_path, local_entry['id']+".nxml"))
                 if os.path.isfile(local_filename_tei):
-                    shutil.copyfile(local_filename_tei, os.path.join(local_dest_path, local_entry['id']+".tei.xml"))
+                    shutil.copyfile(local_filename_tei, os.path.join(local_dest_path, local_entry['id']+".grobid.tei.xml"))
                 if os.path.isfile(local_filename_json):
                     shutil.copyfile(local_filename_json, os.path.join(local_dest_path, local_entry['id']+".json"))
                 if os.path.isfile(local_filename_ref):

@@ -115,11 +115,8 @@ class Nlm2tei(object):
                 print(f)
                 identifier = f.split(".")[0]
                 print(identifier)
-                dest_path = os.path.join(self.config["data_path"], generateStoragePath(identifier), identifier+".tei.xml")
+                dest_path = os.path.join(self.config["data_path"], generateStoragePath(identifier), identifier+".pub2tei.tei.xml")
                 print(dest_path)
-                # if the file already exists, it's the Grobid version that we can keep, but need to be renamed
-                if os.path.isfile(dest_path):
-                    os.rename(dest_path, os.path.join(self.config["data_path"], generateStoragePath(identifier), identifier+".grobid.tei.xml"))
                 shutil.copyfile(os.path.join(temp_dir_out,f), dest_path)
         '''
         try:
