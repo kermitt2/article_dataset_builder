@@ -97,20 +97,20 @@ pip3 install -f requirements
 For instance to process a list of DOI (one DOI per line):
 
 ```console
-python3 harvest --dois test/dois.txt 
+python3 harvest.py --dois test/dois.txt 
 ```
 
 Similarly for a list of PMID or PMC ID:
 
 ```console
-python3 harvest --dois test/pmids.txt 
-python3 harvest --dois test/pmcids.txt 
+python3 harvest.py --pmids test/pmids.txt 
+python3 harvest.py --pmcids test/pmcids.txt 
 ```
 
 For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-20/metadata.csv) file by running: 
 
 ```console
-python3 harvest --cord19 metadata.csv  
+python3 harvest.py --cord19 metadata.csv  
 ```
 
 This will generate a consolidated metadata file (specified by `--out`,  or `consolidated_metadata.json` by default), upload full text files, 
@@ -143,7 +143,19 @@ To create a dump of the consolidated metadata of all the processed files (includ
 python3 harvest.py --dump 
 ```
 
-The generated file is named `consolidated_metadata.json`.
+The generated metadata file is named `consolidated_metadata.json`.
+
+For producing the thumbnail images of the article first page, use `--thumbnail` argument. This option requires `imagemagick` installed on your system and will produce 3 PNG files of size height x150, x300 and x500. These thumbnails can be interesting for offering a preview to an article for an application using these data.
+
+```console
+python3 harvest.py --cord19 metadata.csv --thumbnail 
+```
+
+For producing PDF annotations in JSON format corresponding to the bibliographical information (reference markers in the article and bibliographical references in the bibliographical section), use the argument `--annotation`. See more information about these annotations [here](https://grobid.readthedocs.io/en/latest/Coordinates-in-PDF/). They allow to enrich the display of PDF, and make them more interactive. 
+
+```console
+python3 harvest.py --cord19 metadata.csv --annotation 
+```
 
 ## Generated files
 
@@ -228,6 +240,6 @@ Recent update (end of October 2018) of imagemagick is breaking the normal conver
 
 ## License and contact
 
-Distributed under [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0). The dependencies used in the project are either themselves also distributed under Apache 2.0 license or distributed under a compatible license. 
+Distributed under [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0).
 
 Main author and contact: Patrice Lopez (<patrice.lopez@science-miner.com>)
