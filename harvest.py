@@ -180,6 +180,7 @@ class Harverster(object):
         Unpaywall dataset dump which has a 7-months gap.
         """
         response = requests.get(self.config["unpaywall_base"] + doi, params={'email': self.config["unpaywall_email"]}).json()
+        print(response)
         if response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
             return response['best_oa_location']['url_for_pdf']
         elif response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
@@ -472,6 +473,8 @@ class Harverster(object):
             print("processed", str(line_count), "articles")
 
     def harvest_cord19(self, metadata_csv_file):
+        # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
+        # WHO #Covidence,has_full_text,full_text_file,url
         with open(metadata_csv_file, mode='r') as csv_file:
             csv_reader = csv.DictReader(csv_file)
             line_count = 0 # total count of articles
@@ -493,17 +496,18 @@ class Harverster(object):
                     rows = []
 
                 # check if the entry has already been processed
-                # if a sha is available we use that as CORD-19 entry identifier, however in the version releases on March 21st 2020
-                # a sha is not always present, so we use the DOI as fallback
-                if row["sha"] and len(row["sha"])>0:
-                    if self.getUUIDByStrongIdentifier(row["sha"]) is not None:
+                # we can use from 27.03.2020 update the cord_uid as identifier, and keep doi of course as fallback
+                # we don't use the sha as identifier, just keep it in the metadata
+                if row["cord_uid"] and len(row["cord_uid"])>0:
+                    # in the current version, there is always a cord_uid
+                    if self.getUUIDByStrongIdentifier(row["cord_uid"]) is not None:
                         continue
                 elif row["doi"] and len(row["doi"])>0:
                     if self.getUUIDByStrongIdentifier(row["doi"]) is not None:
                         continue
 
-                # we need a new identifier
-                identifier = str(uuid.uuid4())
+                # we use cord_uid as identifier
+                identifier = row["cord_uid"]
                 identifiers.append(identifier)
                 rows.append(row)
     
@@ -634,7 +638,8 @@ class Harverster(object):
         self.processTask(localJson)
             
     def processEntryCord19(self, identifier, row):
-        # sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,WHO #Covidence,has_full_text,full_text_file
+        # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
+        # WHO #Covidence,has_full_text,full_text_file,url        
         localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
         if localJson is None:
             localJson = {}
@@ -642,7 +647,8 @@ class Harverster(object):
             localJson['year']= row["publish_time"]
         
         localJson["id"] = identifier
-        localJson["cord_identifier"] = row["sha"]
+        # add the CORD-19 sha, though it won't be used
+        localJson["cord_sha"] = row["sha"]
         if row["license"] is not None and len(row["license"])>0:
             localJson["license-simplified"] = row["license"]
         if row["abstract"] is not None and len(row["abstract"])>0:
@@ -667,9 +673,8 @@ class Harverster(object):
         _initProcessStateInformation(localJson)
 
         # update uuid lookup map
-        if row["sha"] and len(row["sha"])>0:
-            with self.env_uuid.begin(write=True) as txn_uuid:
-                txn_uuid.put(row["sha"].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
+        with self.env_uuid.begin(write=True) as txn_uuid:
+            txn_uuid.put(row["cord_uid"].encode(encoding='UTF-8'), identifier.encode(encoding='UTF-8'))
 
         self.updateIdentifierMap(localJson)
         self.processTask(localJson)
