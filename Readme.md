@@ -107,7 +107,7 @@ python3 harvest.py --pmids test/pmids.txt
 python3 harvest.py --pmcids test/pmcids.txt 
 ```
 
-For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-20/metadata.csv) file by running: 
+For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-27/metadata.csv) (last update 27.03.2020) file by running: 
 
 ```console
 python3 harvest.py --cord19 metadata.csv  

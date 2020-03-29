@@ -180,7 +180,6 @@ class Harverster(object):
         Unpaywall dataset dump which has a 7-months gap.
         """
         response = requests.get(self.config["unpaywall_base"] + doi, params={'email': self.config["unpaywall_email"]}).json()
-        print(response)
         if response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
             return response['best_oa_location']['url_for_pdf']
         elif response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
