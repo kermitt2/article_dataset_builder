@@ -139,6 +139,7 @@ class Nlm2tei(object):
         temp_dir = self._create_batch_input()    
         self.process_batch(temp_dir)
         self._manage_batch_results(temp_dir)  
+        # TBD: consolidate raw reference string present in the converted TEI
         runtime = round(time.time() - start_time, 3)
         print("\nruntime: %s seconds " % (runtime))
 

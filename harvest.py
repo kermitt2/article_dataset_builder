@@ -163,15 +163,15 @@ class Harverster(object):
                     # pmid is optional
                     pmid= row[3]
                     license = row[4]
-                    '''
                     localInfo = {}
                     localInfo["subpath"] = subpath
                     localInfo["pmid"] = pmid
                     localInfo["license"] = license
-                    '''
-                    txn.put(pmcid.encode(encoding='UTF-8'), subpath.encode(encoding='UTF-8'))  
+                    txn.put(pmcid.encode(encoding='UTF-8'), _serialize_pickle(localInfo))  
                     count += 1
             txn.commit()               
+        else:
+            self.env_pmc_oa = lmdb.open(envFilePath, map_size=map_size)
 
     def unpaywalling_doi(self, doi):
         """
@@ -226,12 +226,18 @@ class Harverster(object):
 
     def pmc_oa_check(self, pmcid):
         txn = self.env_pmc_oa.begin()
-        pmc_info = txn.get(pmcid.encode(encoding='UTF-8'))
-        if pmc_info is not None:
-            subpath = pmc_info.decode(encoding='UTF-8');
-            return os.path.join(self.config["pmc_base_ftp"],subpath)
-        else:
-            return None
+        pmc_info_object = txn.get(pmcid.encode(encoding='UTF-8'))
+        if pmc_info_object is not None:
+            pmc_info = _deserialize_pickle(pmc_info_object)
+            if "license" in pmc_info:
+                license = pmc_info["license"]
+                license = license.replace("\n","")
+            else:
+                license = ""
+            if "subpath" in pmc_info:
+                subpath = pmc_info["subpath"];
+                return os.path.join(self.config["pmc_base_ftp"],subpath), license
+        return None, None
 
     def biblio_glutton_lookup(self, doi=None, pmcid=None, pmid=None, istex_id=None, istex_ark=None):
         """
@@ -510,7 +516,7 @@ class Harverster(object):
                     # branch to the right entry processor, depending on the input csv 
                     executor.map(self.processEntryCord19, identifiers, rows)
 
-            print("processed", str(line_count), "article DOI")
+            print("processed", str(line_count), "articles from CORD-19")
 
     def harvest_pmids(self, pmids_file):
         with open(pmids_file, 'rt') as fp:
@@ -687,7 +693,7 @@ class Harverster(object):
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
             # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
             if "pmcid" in localJson:
-                localUrl = self.pmc_oa_check(pmcid=localJson["pmcid"])
+                localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
 
             if localUrl is None:
                 # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 

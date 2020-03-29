@@ -16,6 +16,7 @@ data/*
 my_config.json
 __pycache__
 consolidated_metadata.json
+test.py
 resources/*
 !resources/.gitkeep 
 !resources/elsevier_covid_map_23_03_2020.csv.gz
