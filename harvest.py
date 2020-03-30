@@ -739,7 +739,7 @@ class Harverster(object):
                 if localUrl is not None and len(localUrl)>0:
                     if localUrl.startswith("file://") and os.path.isfile(localUrl.replace("file://","")):
                         shutil.copyfile(localUrl.replace("file://",""), pdf_filename)
-                    if localUrl.endswith(".tar.gz"):
+                    elif localUrl.endswith(".tar.gz"):
                         archive_file = os.path.join(self.config["data_path"], identifier+".tar.gz")
                         _download(localUrl, archive_file)
                         _manage_pmc_archives(archive_file)
@@ -1064,7 +1064,7 @@ def _download_wget(url, filename):
         result_compression = _check_compression(filename)
         if not result_compression:
             # decompression failed, or file is invalid
-            if os.pathisfile(filename):
+            if os.path.isfile(filename):
                 try:
                     os.remove(filename)
                 except OSError:
