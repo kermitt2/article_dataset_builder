@@ -385,7 +385,6 @@ class Harverster(object):
                         tei_file.write(r.text)
                 except OSError:  
                    print ("Writing resulting TEI XML file %s failed" % output)
-                   pass
 
         # reference annotation file
         if annotation_output is not None:
@@ -428,7 +427,6 @@ class Harverster(object):
                         json_file.write(r.text)
                 except OSError:  
                    print ("Writing resulting JSON file %s failed" % annotation_output)
-                   pass
 
     def harvest_dois(self, dois_file):
         with open(dois_file, 'rt') as fp:
@@ -719,7 +717,7 @@ class Harverster(object):
                     localUrl = self.unpaywalling_doi(localJson['DOI'])
                 except:
                     print("Unpaywall API call not succesful")   
-                    pass
+                    
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
                     # we can try to use the OA link from bibilio-glutton as fallback (though not very optimistic on this!)
@@ -972,11 +970,20 @@ def _check_compression(file):
             # uncompressed in tmp file
             with gzip.open(file, 'rb') as f_in:
                 with open(file+'.uncompressed', 'wb') as f_out:
-                    shutil.copyfileobj(f_in, f_out)
+                    try:
+                        shutil.copyfileobj(f_in, f_out)
+                    except OSError:  
+                        print ("Copy of compressed file failed:", f_in)
             # replace the file
-            shutil.copyfile(file+'.uncompressed', file)
+            try:
+                shutil.copyfile(file+'.uncompressed', file)
+            except OSError:  
+                print ("Replacement of uncompressed file failed:", file)
             # delete the tmp file
-            os.remove(file+'.uncompressed')
+            try:
+                os.remove(file+'.uncompressed')
+            except OSError:  
+                print ("Deletion of temp uncompressed file failed:", file+'.uncompressed')    
 
 def _is_valid_file(file, mime_type):
     target_mime = []
@@ -1025,7 +1032,7 @@ def _download(url, filename):
     #cmd = "wget -c --quiet" + " -O " + filename + ' --connect-timeout=10 --waitretry=10 ' + \
     cmd = "wget -c --quiet" + " -O " + filename + '  --timeout=2 --waitretry=0 --tries=5 --retry-connrefused ' + \
         '--header="User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0" ' + \
-        '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
+        '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip" ' + \
         '"' + url + '"'
         #' --random-wait' +
     #print(cmd)
@@ -1091,6 +1098,10 @@ def _download(url, filename):
             result = error['message']
         else:
             result = e.returncode
+    except:
+        # a bit of bad practice
+        print("Unexpected error")
+        pass
 
     return str(result)
 
