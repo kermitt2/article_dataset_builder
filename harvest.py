@@ -740,7 +740,9 @@ class Harverster(object):
                     if localUrl.startswith("file://") and os.path.isfile(localUrl.replace("file://","")):
                         shutil.copyfile(localUrl.replace("file://",""), pdf_filename)
                     if localUrl.endswith(".tar.gz"):
-                        _download(localUrl, os.path.join(self.config["data_path"], identifier+".tar.gz"))
+                        archive_file = os.path.join(self.config["data_path"], identifier+".tar.gz")
+                        _download(localUrl, archive_file)
+                        _manage_pmc_archives(archive_file)
                     else:
                         _download(localUrl, pdf_filename)
                     if _is_valid_file(pdf_filename, "pdf"):
@@ -967,23 +969,33 @@ def _check_compression(file):
             return False
         file_type = magic.from_file(file, mime=True)
         if file_type == 'application/gzip':
-            # uncompressed in tmp file
+            success = False
+            # decompressed in tmp file
             with gzip.open(file, 'rb') as f_in:
-                with open(file+'.uncompressed', 'wb') as f_out:
+                with open(file+'.decompressed', 'wb') as f_out:
                     try:
                         shutil.copyfileobj(f_in, f_out)
                     except OSError:  
-                        print ("Copy of compressed file failed:", f_in)
+                        print ("Decompression file failed:", f_in)
+                    else:
+                        success = True
             # replace the file
-            try:
-                shutil.copyfile(file+'.uncompressed', file)
-            except OSError:  
-                print ("Replacement of uncompressed file failed:", file)
+            if success:
+                try:
+                    shutil.copyfile(file+'.decompressed', file)
+                except OSError:  
+                    print ("Replacement of decompressed file failed:", file)
+                    success = False
             # delete the tmp file
-            try:
-                os.remove(file+'.uncompressed')
-            except OSError:  
-                print ("Deletion of temp uncompressed file failed:", file+'.uncompressed')    
+            if os.path.isfile(file+'.decompressed'):
+                try:
+                    os.remove(file+'.decompressed')
+                except OSError:  
+                    print ("Deletion of temp decompressed file failed:", file+'.decompressed')    
+            return success
+        else:
+            return True
+    return False
 
 def _is_valid_file(file, mime_type):
     target_mime = []
@@ -1026,21 +1038,85 @@ def _grobid_url(grobid_base, grobid_port):
     return the_url
 
 def _download(url, filename):
+    result = _download_wget(url, filename)
+    if result != "success":
+        result = _download_requests(url, filename)
+    return result
+
+def _download_wget(url, filename):
+    """ 
+    First try with Python requests (which handle well compression), then move to a more robust download approach
     """
-    This is simply the most robust and reliable way to download files I found with Python... to rely on system wget :)
-    """
+    result = "fail"
+    # This is the most robust and reliable way to download files I found with Python... to rely on system wget :)
     #cmd = "wget -c --quiet" + " -O " + filename + ' --connect-timeout=10 --waitretry=10 ' + \
-    cmd = "wget -c --quiet" + " -O " + filename + '  --timeout=2 --waitretry=0 --tries=5 --retry-connrefused ' + \
+    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=5 --waitretry=0 --tries=10 --retry-connrefused ' + \
         '--header="User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0" ' + \
-        '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip" ' + \
+        '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
+        '--no-check-certificate ' + \
         '"' + url + '"'
-        #' --random-wait' +
     #print(cmd)
     try:
         result = subprocess.check_call(cmd, shell=True)
         #print("result:", result)
-        # check if finename exists and we have downloaded an archive rather than a PDF (case ftp PMC)
-        if os.path.isfile(filename) and filename.endswith(".tar.gz"):
+        
+        # if the used version of wget does not decompress automatically, the following ensures it is done
+        result_compression = _check_compression(filename)
+        if not result_compression:
+            # decompression failed, or file is invalid
+            if os.pathisfile(filename):
+                try:
+                    os.remove(filename)
+                except OSError:
+                    print ("Deletion of invalid compressed file failed:", filename) 
+                    result = "fail"
+            # ensure cleaning
+            if os.path.isfile(filename+'.decompressed'):
+                try:
+                    os.remove(filename+'.decompressed')
+                except OSError:  
+                    print ("Final deletion of temp decompressed file failed:", filename+'.decompressed')    
+
+    except subprocess.CalledProcessError as e:   
+        print("e.returncode", e.returncode)
+        print("e.output", e.output)
+        print("wget command was: "+cmd)
+        #if e.output is not None and e.output.startswith('error: {'):
+        if  e.output is not None:
+            error = json.loads(e.output[7:]) # Skip "error: "
+            print("error code:", error['code'])
+            print("error message:", error['message'])
+            result = error['message']
+        else:
+            result = e.returncode
+
+    except Exception as e:
+        # a bit of bad practice
+        print("Unexpected error wget process", e)
+        result = "fail"
+
+    return str(result)
+
+def _download_requests(url, filename):
+    """ 
+    Download with Python requests which handle well compression, but not very robust and bad parallelization
+    """
+    HEADERS = {"""User-Agent""": """Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0"""}
+    result = "fail" 
+    try:
+        file_data = requests.get(url, allow_redirects=True, headers=HEADERS)
+        if file_data.status_code == 200:
+            with open(filename, 'wb') as f_out:
+                f_out.write(file_data.content)
+            result = "success"
+    except Exception:
+        print("Download failed for {0} with requests".format(url))
+    return result
+
+def _manage_pmc_archives(filename):
+    # check if finename exists and we have downloaded an archive rather than a PDF (case ftp PMC)
+    if os.path.isfile(filename) and filename.endswith(".tar.gz"):
+        try:
             # for PMC we still have to extract the PDF from archive
             #print(filename, "is an archive")
             thedir = os.path.dirname(filename)
@@ -1065,7 +1141,10 @@ def _download(url, filename):
                         os.rename(os.path.join(thedir,tmp_subdir,member.name), filename.replace(".tar.gz", ".pdf"))                        
                         pdf_found = True
                     # delete temporary unique subdirectory
-                    shutil.rmtree(os.path.join(thedir,tmp_subdir))
+                    try:
+                        shutil.rmtree(os.path.join(thedir,tmp_subdir))
+                    except OSError:  
+                        print ("Deletion of tmp dir failed:", os.path.join(thedir,tmp_subdir))     
                     #break
                 if member.isfile() and member.name.endswith(".nxml"):
                     member.name = os.path.basename(member.name)
@@ -1078,32 +1157,22 @@ def _download(url, filename):
                     if os.path.isfile(os.path.join(thedir,tmp_subdir,member.name)):
                         os.rename(os.path.join(thedir,tmp_subdir,member.name), filename.replace(".tar.gz", ".nxml"))
                     # delete temporary unique subdirectory
-                    shutil.rmtree(os.path.join(thedir,tmp_subdir))
+                    try:
+                        shutil.rmtree(os.path.join(thedir,tmp_subdir))
+                    except OSError:  
+                        print ("Deletion of tmp dir failed:", os.path.join(thedir,tmp_subdir))      
             tar.close()
             if not pdf_found:
                 print("warning: no pdf found in archive:", filename)
             if os.path.isfile(filename):
-                os.remove(filename)
-        # if the used version of wget does not decompress automatically, the following ensures it is done
-        _check_compression(filename)
-
-    except subprocess.CalledProcessError as e:   
-        print("e.returncode", e.returncode)
-        print("e.output", e.output)
-        #if e.output is not None and e.output.startswith('error: {'):
-        if  e.output is not None:
-            error = json.loads(e.output[7:]) # Skip "error: "
-            print("error code:", error['code'])
-            print("error message:", error['message'])
-            result = error['message']
-        else:
-            result = e.returncode
-    except:
-        # a bit of bad practice
-        print("Unexpected error")
-        pass
-
-    return str(result)
+                try:
+                    os.remove(filename)
+                except OSError:  
+                    print ("Deletion of PMC archive file failed:", filename) 
+        except Exception as e:
+            # a bit of bad practice
+            print("Unexpected error", e)
+            pass
 
 def generate_thumbnail(pdfFile):
     """
