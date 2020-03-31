@@ -1058,7 +1058,6 @@ def _download_wget(url, filename):
     #print(cmd)
     try:
         result = subprocess.check_call(cmd, shell=True)
-        #print("result:", result)
         
         # if the used version of wget does not decompress automatically, the following ensures it is done
         result_compression = _check_compression(filename)
@@ -1076,7 +1075,9 @@ def _download_wget(url, filename):
                     os.remove(filename+'.decompressed')
                 except OSError:  
                     print ("Final deletion of temp decompressed file failed:", filename+'.decompressed')    
-
+        else:
+            result="success"
+            
     except subprocess.CalledProcessError as e:   
         print("e.returncode", e.returncode)
         print("e.output", e.output)
@@ -1086,9 +1087,7 @@ def _download_wget(url, filename):
             error = json.loads(e.output[7:]) # Skip "error: "
             print("error code:", error['code'])
             print("error message:", error['message'])
-            result = error['message']
-        else:
-            result = e.returncode
+        result = "fail"
 
     except Exception as e:
         # a bit of bad practice
