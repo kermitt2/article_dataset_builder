@@ -139,6 +139,7 @@ class Harverster(object):
 
         envFilePath = os.path.join(self.resource_path, 'pmc_oa')
         if os.path.isfile(resource_file) and not os.path.isdir(envFilePath):
+            # open in write mode
             self.env_pmc_oa = lmdb.open(envFilePath, map_size=map_size)
             txn = self.env_pmc_oa.begin(write=True)
 
@@ -167,11 +168,13 @@ class Harverster(object):
                     localInfo["subpath"] = subpath
                     localInfo["pmid"] = pmid
                     localInfo["license"] = license
-                    txn.put(pmcid.encode(encoding='UTF-8'), _serialize_pickle(localInfo))  
+                    txn.put(pmcid.encode(encoding='UTF-8'), _serialize_pickle(localInfo)) 
                     count += 1
             txn.commit()               
-        else:
-            self.env_pmc_oa = lmdb.open(envFilePath, map_size=map_size)
+            self.env_pmc_oa.close()
+
+        # open in read mode only
+        self.env_pmc_oa = lmdb.open(envFilePath, readonly=True, lock=False)
 
     def unpaywalling_doi(self, doi):
         """
@@ -225,18 +228,24 @@ class Harverster(object):
             return os.path.join(self.config["cord19_elsevier_pdf_path"],self.elsevier_oa_map[pii])
 
     def pmc_oa_check(self, pmcid):
-        txn = self.env_pmc_oa.begin()
-        pmc_info_object = txn.get(pmcid.encode(encoding='UTF-8'))
-        if pmc_info_object is not None:
-            pmc_info = _deserialize_pickle(pmc_info_object)
-            if "license" in pmc_info:
-                license = pmc_info["license"]
-                license = license.replace("\n","")
-            else:
-                license = ""
-            if "subpath" in pmc_info:
-                subpath = pmc_info["subpath"];
-                return os.path.join(self.config["pmc_base_ftp"],subpath), license
+        try:
+            with self.env_pmc_oa.begin() as txn:
+                pmc_info_object = txn.get(pmcid.encode(encoding='UTF-8'))
+                if pmc_info_object:
+                    try:
+                        pmc_info = _deserialize_pickle(pmc_info_object)
+                    except:
+                        print("omg _deserialize_pickle failed?")
+                    if "license" in pmc_info:
+                        license = pmc_info["license"]
+                        license = license.replace("\n","")
+                    else:
+                        license = ""
+                    if "subpath" in pmc_info:
+                        subpath = pmc_info["subpath"];
+                        return os.path.join(self.config["pmc_base_ftp"],subpath), license
+        except lmdb.Error:
+            print("lmdb pmc os look-up failed")
         return None, None
 
     def biblio_glutton_lookup(self, doi=None, pmcid=None, pmid=None, istex_id=None, istex_ark=None):
@@ -282,6 +291,9 @@ class Harverster(object):
                 # filter out references and re-set doi, in case there are obtained via crossref
                 if "reference" in jsonResult:
                     del jsonResult["reference"]
+            else:
+                success = False
+                jsonResult = None
         
         return jsonResult
 
@@ -451,6 +463,7 @@ class Harverster(object):
                 the_doi = _clean_doi(the_doi)
                 # check if the entry has already been processed
                 if self.getUUIDByStrongIdentifier(the_doi) is not None:
+                    line_count += 1
                     continue
 
                 # we need a new identifier
@@ -479,9 +492,6 @@ class Harverster(object):
             identifiers = []
             rows = []
             for row in csv_reader:
-                if line_count == 0:
-                    line_count += 1
-                    continue
 
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
@@ -498,9 +508,11 @@ class Harverster(object):
                 if row["cord_uid"] and len(row["cord_uid"])>0:
                     # in the current version, there is always a cord_uid
                     if self.getUUIDByStrongIdentifier(row["cord_uid"]) is not None:
+                        line_count += 1
                         continue
                 elif row["doi"] and len(row["doi"])>0:
                     if self.getUUIDByStrongIdentifier(row["doi"]) is not None:
+                        line_count += 1
                         continue
 
                 # we use cord_uid as identifier
@@ -540,6 +552,7 @@ class Harverster(object):
                 the_pmid = line.strip()
                 # check if the entry has already been processed
                 if self.getUUIDByStrongIdentifier(the_pmid) is not None:
+                    line_count += 1
                     continue
 
                 # we need a new identifier
@@ -578,6 +591,7 @@ class Harverster(object):
                 the_pmcid = line.strip()
                 # check if the entry has already been processed
                 if self.getUUIDByStrongIdentifier(the_pmcid) is not None:
+                    line_count += 1
                     continue
 
                 # we need a new identifier
@@ -660,6 +674,8 @@ class Harverster(object):
         
         if 'DOI' in localJson:
             print("processing", localJson['DOI'], "as", identifier)
+        else:
+            print("processing", identifier)
 
         # add possible missing information in the metadata entry
         if row["pmcid"] is not None and len(row["pmcid"])>0 and 'pmcid' not in localJson:
@@ -725,7 +741,7 @@ class Harverster(object):
             else:
                 localJson["oaLink"] = localUrl
 
-            if localUrl is not None and len(localUrl)>0:
+            if "oaLink" in localJson and localJson["oaLink"] is not None and len(localJson["oaLink"])>0:
                 localJson["has_valid_oa_url"] = True
 
         if "oaLink" in localJson:
@@ -756,7 +772,10 @@ class Harverster(object):
                 annotation_filename = os.path.join(self.config["data_path"], identifier+"-ref-annotations.json")
             if localJson["has_valid_pdf"]:
                 # GROBIDification with full biblio consolidation
-                self.run_grobid(pdf_filename, tei_filename, annotation_filename)
+                try:
+                    self.run_grobid(pdf_filename, tei_filename, annotation_filename)
+                except:
+                    print("Grobid call failed")    
                 if _is_valid_file(tei_filename, "xml"):
                     localJson["has_valid_tei"] = True
                 if self.annotation and _is_valid_file(annotation_filename, "json"):
@@ -1076,8 +1095,8 @@ def _download_wget(url, filename):
                 except OSError:  
                     print ("Final deletion of temp decompressed file failed:", filename+'.decompressed')    
         else:
-            result="success"
-            
+            result = "success"
+
     except subprocess.CalledProcessError as e:   
         print("e.returncode", e.returncode)
         print("e.output", e.output)
