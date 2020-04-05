@@ -11,6 +11,8 @@ Input currently supported:
 
 To do:
 - list of ISTEX identifiers or ark, one DOI per line
+- Apache Airflow for the task workflow
+- consolidate/resolve bibliographical references obtained via Pub2TEI
 
 ## What:
 
