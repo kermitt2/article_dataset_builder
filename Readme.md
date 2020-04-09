@@ -93,7 +93,7 @@ optional arguments:
 Fill the file `config.json` with relevant service and parameter url, then install the python mess:
 
 ```console
-pip3 install -f requirements
+pip3 install -r requirements.txt
 ```
 
 For instance to process a list of DOI (one DOI per line):
