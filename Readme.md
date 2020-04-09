@@ -5,7 +5,7 @@ Python utility for harvesting efficiently a large Open Access collection of PDF 
 Input currently supported:
 
 - list of DOI in a file, one DOI per line
-- metadata csv input file from [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research)
+- metadata csv input file from [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), see the CORD-19 result section below to see the capacity of the tool to get more full texts and better data quality that the official dataset 
 - list of PMID in a file, one DOI per line
 - list of PMC ID in a file, one DOI per line
 
@@ -182,7 +182,9 @@ The UUID identifier for a particular article is given in the generated `consolid
 
 The `*.nxml` files correspond to the JATS files available for PMC (Open Access set only).
 
-## Using a local PDF repository for CORD-19
+##On harvesting and ingesting the CORD-19 dataset
+
+###Using a local PDF repository for CORD-19
 
 The [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research) includes more than 19k articles corresponding to a set of Elsevier articles on COVID-19 [recently put in Open Access](https://www.elsevier.com/connect/coronavirus-information-center). As Unpaywall does not cover these OA articles (on 23.03.2020 at least), you would need to download first these PDF and indicates to the harvesting tool where the local repository of PDF is located: 
 
@@ -206,6 +208,29 @@ mget *
 ```
 
 That's it. The file `./elsevier_covid_map_23_03_2020.csv.gz` contains a map of DOI and PII (the Elsevier article identifiers) for these OA articles. 
+
+###Results
+
+Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-28/metadata.csv)) to illustrate the interest of the tool:
+
+|---|---|---|
+|   | official CORD-19 | this harvester |
+|---|---|---|
+| entries | 45,828 | 45,828 | 
+| valid OA URL | - | 42,664|
+| downloaded PDF | - | 42,209 | 
+| full texts | ~33,000 (JSON) | 40,964 (TEI XML) |
+|---|---|---|
+
+Other main differences include:
+
+- the XML TEI contain richer structured full text, 
+- usage of recent GROBID models (with extra medRxiv and bioRxiv training data), 
+- additional PMC JATS files download and conversion (normally without information loss), note that is introduced in CORD-19 since version 6 
+- full consolidation of the bibliographical references with publisher metadata, DOI, PMID, PMC ID, etc. when available
+- consolidation of article metadata with CrossRef and PubMed aggregations for the entries 
+
+We will try to re-ingest and update these numbers with version 7 of the dataset! 
 
 ## Converting the PMC XML JATS files into XML TEI
 
