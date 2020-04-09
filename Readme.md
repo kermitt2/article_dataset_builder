@@ -40,12 +40,16 @@ To install `imagemagick`:
 
 - on Linux Ubuntu:
 
-> sudo apt update
-> sudo apt build-dep imagemagick
+```console
+sudo apt update
+sudo apt build-dep imagemagick
+```
 
 - on macos:
 
-> brew install libmagic
+```console
+brew install libmagic
+```
 
 ## Installation
 
