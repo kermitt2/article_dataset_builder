@@ -36,6 +36,16 @@ Optionally:
 
 The utility has been tested with Python 3.5+. It is developed for a deployment on a POSIX/Linux server (it uses `imagemagick` as external process to generate thumbnails and `wget`). An S3 account and bucket must have been created for non-local storage of the data collection. 
 
+To install `imagemagick`:
+
+- on Linux Ubuntu:
+
+> sudo apt update
+> sudo apt build-dep imagemagick
+
+- on macos:
+
+> brew install libmagic
 
 ## Installation
 
@@ -209,7 +219,7 @@ mget *
 
 That's it. The file `./elsevier_covid_map_23_03_2020.csv.gz` contains a map of DOI and PII (the Elsevier article identifiers) for these OA articles. 
 
-### Results
+### Results with CORD-19
 
 Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-28/metadata.csv)) to illustrate the interest of the tool:
 
