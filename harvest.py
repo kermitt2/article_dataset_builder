@@ -506,7 +506,7 @@ class Harverster(object):
                 # we can use from 27.03.2020 update the cord_uid as identifier, and keep doi of course as fallback
                 # we don't use the sha as identifier, just keep it in the metadata
                 if row["cord_uid"] and len(row["cord_uid"])>0:
-                    # in the current version, there is always a cord_uid
+                    # in the current version, there is always a cord_uid normally
                     if self.getUUIDByStrongIdentifier(row["cord_uid"]) is not None:
                         line_count += 1
                         continue
@@ -618,7 +618,7 @@ class Harverster(object):
 
         print("processing", localJson['DOI'], "as", identifier)
 
-        _initProcessStateInformation(localJson)
+        localJson = _initProcessStateInformation(localJson)
         self.updateIdentifierMap(localJson)
         self.processTask(localJson)
 
@@ -631,7 +631,7 @@ class Harverster(object):
 
         print("processing", localJson['pmid'], "as", identifier)
 
-        _initProcessStateInformation(localJson)
+        localJson = _initProcessStateInformation(localJson)
         self.updateIdentifierMap(localJson)
         self.processTask(localJson)
 
@@ -644,14 +644,19 @@ class Harverster(object):
 
         print("processing", localJson['pmcid'], "as", identifier)
 
-        _initProcessStateInformation(localJson)
+        localJson = _initProcessStateInformation(localJson)
         self.updateIdentifierMap(localJson)
         self.processTask(localJson)
             
     def processEntryCord19(self, identifier, row):
         # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
-        # WHO #Covidence,has_full_text,full_text_file,url        
-        localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
+        # WHO #Covidence,has_full_text,full_text_file,url  
+        try:    
+            localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
+        except:
+            print("biblio-glutton call fails")
+            localJson = None
+
         if localJson is None:
             localJson = {}
             localJson['title'] = row["title"]
@@ -683,7 +688,7 @@ class Harverster(object):
         if row["pubmed_id"] is not None and len(row["pubmed_id"])>0 and 'pmid' not in localJson:
             localJson['pmid'] = row["pubmed_id"]
 
-        _initProcessStateInformation(localJson)
+        localJson = _initProcessStateInformation(localJson)
 
         # update uuid lookup map
         with self.env_uuid.begin(write=True) as txn_uuid:
@@ -900,7 +905,7 @@ class Harverster(object):
         txn = self.env_uuid.begin()
         return txn.get(strong_identifier.encode(encoding='UTF-8'))
 
-    def diagnostic(self):
+    def diagnostic(self, full=False):
         """
         Print a report on failures stored during the harvesting process
         """
@@ -926,11 +931,68 @@ class Harverster(object):
                 else:
                     nb_total_valid += 1
 
+        print("---")
         print("total entries:", nb_total)
-        print("total valid entries:", nb_total_valid)
+        print("---")
+        print("total valid entries:", nb_total_valid, "entries with valid OA URL and PDF and TEI XML")
+        print("---")
         print("total invalid OA URL:", nb_invalid_oa_url)
+        print("total entries with valid OA URL:", str(nb_total-nb_invalid_oa_url))
+        print("---")
         print("total invalid PDF:", nb_invalid_pdf)
+        print("total entries with successfully downloaded PDF:", str(nb_total-nb_invalid_pdf))
+        print("---")
         print("total invalid TEI:", nb_invalid_tei)
+        print("total entries with successfully convereted TEI XML:", str(nb_total-nb_invalid_tei))
+        print("---")
+
+        if full:
+            # check if we have the identifier map entries not present in the metadata map (this would indicate
+            # some sort of silent failure in the process, having no aggregated metadata saved)
+
+            nb_missing_metadata_entry = 0
+            nb_total_identifiers = 0
+            identifiers = set()
+            # iterate over the identifier lmdb
+            with self.env_uuid.begin(write=True) as txn:
+                cursor = txn.cursor()
+                for key, value in cursor:
+                    decoded_value = value.decode(encoding='UTF-8')
+                    if decoded_value not in identifiers:
+                        identifiers.add(decoded_value)
+                        nb_total_identifiers += 1
+                    # do we have a corresponding entry?
+                    with self.env_entries.begin(write=False) as txn2:
+                        metadata_object = txn2.get(value)
+                        if not metadata_object:
+                            nb_missing_metadata_entry += 1
+            
+            print("total identifiers:", nb_total_identifiers)
+            print("total missing entries in metadata map:", str(nb_missing_metadata_entry))
+            print("---")
+
+            # check the presence of the TEI files, from Grobid, Pub2TEI and the entries with at least one
+            # TEI XML file - walk through the data directory
+            nb_tei_present = 0
+            nb_grobid_tei_present = 0
+            nb_pub2tei_tei_present = 0
+            for root, dirs, files in os.walk(self.config["data_path"]):
+                for the_file in files:
+                    if the_file.endswith(".json"):
+                        # we have an entry normally, check if we have a TEI file
+                        grobid_tei_file = os.path.join(root,the_file.replace(".json", ".grobid.tei.xml"))
+                        pub2tei_tei_file = os.path.join(root,the_file.replace(".json", ".pub2tei.tei.xml"))
+                        if os.path.isfile(grobid_tei_file) or os.path.isfile(pub2tei_tei_file):
+                            nb_tei_present += 1
+                        if os.path.isfile(grobid_tei_file):
+                            nb_grobid_tei_present += 1
+                        if os.path.isfile(pub2tei_tei_file):
+                            nb_pub2tei_tei_present += 1
+
+            print("total entries with GROBID TEI file:", str(nb_grobid_tei_present))
+            print("total entries with Pub2TEI TEI file:", str(nb_pub2tei_tei_present))
+            print("total entries with at least one TEI file:", str(nb_tei_present))
+            print("---")
 
     def reprocessFailed(self):
         localJsons = []
@@ -1039,6 +1101,7 @@ def _initProcessStateInformation(json_entry):
     json_entry["has_valid_tei"] = False
     json_entry["has_valid_ref_annotation"] = False
     json_entry["has_valid_thumbnail"] = False
+    return json_entry
 
 def _biblio_glutton_url(biblio_glutton_base, biblio_glutton_port):
     if biblio_glutton_base.endswith("/"):
@@ -1239,6 +1302,7 @@ if __name__ == "__main__":
     parser.add_argument("--reprocess", action="store_true", help="reprocessed existing failed entries") 
     parser.add_argument("--thumbnail", action="store_true", help="generate thumbnail files for the front page of the harvested PDF") 
     parser.add_argument("--annotation", action="store_true", help="generate bibliographical annotations with coordinates for the harvested PDF") 
+    parser.add_argument("--diagnostic", action="store_true", help="perform a full consistency diagnostic on the harvesting and transformation process") 
     #parser.add_argument("--sample", type=int, default=None, help="harvest only a random sample of indicated size")
     parser.add_argument("--dump", action="store_true", help="write all the consolidated metadata in json in the file consolidated_metadata.json") 
 
@@ -1254,6 +1318,7 @@ if __name__ == "__main__":
     thumbnail = args.thumbnail
     annotation = args.annotation
     reprocess = args.reprocess
+    full_diagnostic = args.diagnostic
     #sample = args.sample
 
     harvester = Harverster(config_path=config_path, thumbnail=thumbnail, sample=None, dump_metadata=dump, annotation=annotation)
@@ -1289,7 +1354,7 @@ if __name__ == "__main__":
             sys.exit(0)    
         harvester.harvest_pmcids(pmcids_path)
 
-    harvester.diagnostic()
+    harvester.diagnostic(full=full_diagnostic)
 
     if dump :
         harvester.dump_metadata()
