@@ -230,9 +230,9 @@ Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2
 |   | official CORD-19 | this harvester |
 |---|---|---|
 | entries | 45,828 | 45,828 | 
-| valid OA URL | - | 42,664|
-| downloaded PDF | - | 42,209 | 
-| full texts | ~33,000 (JSON) | 40,964 (TEI XML) |
+| valid OA URL | - | 42,742|
+| downloaded PDF | - | 42,362 | 
+| structured full texts | ~33,000 (JSON) | 40,950 (TEI XML) |
 
 Other main differences include:
 
