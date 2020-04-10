@@ -78,7 +78,7 @@ TBD
 ```
 usage: harvest.py [-h] [--dois DOIS] [--cord19 CORD19] [--pmids PMIDS]
                   [--pmcids PMCIDS] [--config CONFIG] [--reset] [--reprocess]
-                  [--thumbnail] [--annotation] [--dump]
+                  [--thumbnail] [--annotation] [--diagnostic] [--dump]
 
 COVIDataset harvester
 
@@ -100,6 +100,8 @@ optional arguments:
                    harvested PDF
   --annotation     generate bibliographical annotations with coordinates for
                    the harvested PDF
+  --diagnostic     perform a full consistency diagnostic on the harvesting and
+                   transformation process
   --dump           write all the consolidated metadata in json in the file
                    consolidated_metadata.json
 ```
@@ -173,6 +175,12 @@ For producing PDF annotations in JSON format corresponding to the bibliographica
 python3 harvest.py --cord19 metadata.csv --annotation 
 ```
 
+Finally you can run a short diagnostic/reporting on the latest harvesting like this:
+
+```console
+python3 harvest.py --diagnostic 
+```
+
 ## Generated files
 
 Structure of the generated files for an article having as UUID identifier `98da17ff-bf7e-4d43-bdf2-4d8d831481e5`
@@ -232,7 +240,9 @@ Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2
 | entries | 45,828 | 45,828 | 
 | valid OA URL | - | 42,742|
 | downloaded PDF | - | 42,362 | 
-| structured full texts | ~33,000 (JSON) | 40,950 (TEI XML) |
+| structured full texts via GROBID | ~33,000 (JSON) | 40,950 (TEI XML) |
+| structured full texts via PMC JATS | - | 15,576 (TEI XML) |
+| entries with at least one structured full text | ~33,000 (JSON) | 41,534 (TEI XML) |
 
 Other main differences include:
 

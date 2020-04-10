@@ -59,7 +59,8 @@ class Nlm2tei(object):
             for the_file in files:
                 if the_file.endswith(".nxml"):
                     print(root, the_file)
-                    shutil.copy(os.path.join(root,the_file), temp_dir)
+                    if not os.path.isfile(os.path.join(temp_dir,the_file)):
+                        shutil.copy(os.path.join(root,the_file), temp_dir)
 
         # add dummy DTD files for JATS to avoid errors and crazy online DTD download
         open(os.path.join(temp_dir,"JATS-archivearticle1.dtd"), 'a').close()
