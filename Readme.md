@@ -237,12 +237,12 @@ Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2
 
 |   | official CORD-19 | this harvester |
 |---|---|---|
-| entries | 45,828 | 45,828 | 
-| valid OA URL | - | 42,742|
-| downloaded PDF | - | 42,362 | 
-| structured full texts via GROBID | ~33,000 (JSON) | 40,950 (TEI XML) |
-| structured full texts via PMC JATS | - | 15,576 (TEI XML) |
-| entries with at least one structured full text | ~33,000 (JSON) | 41,534 (TEI XML) |
+| total entries | 45,828 | 45,828 | 
+| entries with valid OA URL | - | 42,742|
+| entries with successfully downloaded PDF | - | 42,362 | 
+| entries with structured full texts via GROBID | ~33,000 (JSON) | 40,950 (TEI XML) |
+| entries with structured full texts via PMC JATS | - | 15,576 (TEI XML) |
+| __total entries with at least one structured full text__ | __~33,000 (JSON)__ | __41,534 (TEI XML)__ |
 
 Other main differences include:
 
