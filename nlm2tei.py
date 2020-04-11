@@ -58,7 +58,7 @@ class Nlm2tei(object):
         for root, dirs, files in os.walk(self.config["data_path"]):
             for the_file in files:
                 if the_file.endswith(".nxml"):
-                    print(root, the_file)
+                    #print(root, the_file)
                     if not os.path.isfile(os.path.join(temp_dir,the_file)):
                         shutil.copy(os.path.join(root,the_file), temp_dir)
 

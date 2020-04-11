@@ -240,14 +240,14 @@ Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2
 | total entries | 45,828 | 45,828 | 
 | entries with valid OA URL | - | 42,742|
 | entries with successfully downloaded PDF | - | 42,362 | 
-| entries with structured full texts via GROBID | ~33,000 (JSON) | 40,950 (TEI XML) |
-| entries with structured full texts via PMC JATS | - | 15,576 (TEI XML) |
-| __total entries with at least one structured full text__ | __~33,000 (JSON)__ | __41,534 (TEI XML)__ |
+| entries with structured full texts via GROBID | ~33,000 (JSON) | 41,070 (TEI XML) |
+| entries with structured full texts via PMC JATS | - | 15,955 (TEI XML) |
+| __total entries with at least one structured full text__ | __~33,000 (JSON)__ | __41,609 (TEI XML)__ |
 
 Other main differences include:
 
 - the XML TEI contain richer structured full text, 
-- usage of recent GROBID models (with extra medRxiv and bioRxiv training data), 
+- usage of more recent GROBID models (with extra medRxiv and bioRxiv training data), 
 - additional PMC JATS files download and conversion with [Pub2TEI](https://github.com/kermitt2/Pub2TEI) (normally without information loss because the TEI custumization we are using superseeds the structures covered by JATS). Note a conversion from PMC JATS files has introduced in CORD-19 since version 6. 
 - full consolidation of the bibliographical references with publisher metadata, DOI, PMID, PMC ID, etc. when available
 - consolidation of article metadata with CrossRef and PubMed aggregations for the entries 
