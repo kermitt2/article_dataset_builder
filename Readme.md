@@ -248,7 +248,7 @@ Other main differences include:
 
 - the XML TEI contain richer structured full text, 
 - usage of more recent GROBID models (with extra medRxiv and bioRxiv training data), 
-- additional PMC JATS files download and conversion with [Pub2TEI](https://github.com/kermitt2/Pub2TEI) (normally without information loss because the TEI custumization we are using superseeds the structures covered by JATS). Note a conversion from PMC JATS files has introduced in CORD-19 since version 6. 
+- additional PMC JATS files download and conversion with [Pub2TEI](https://github.com/kermitt2/Pub2TEI) (normally without information loss because the TEI custumization we are using superseeds the structures covered by JATS). Note a conversion from PMC JATS files has been introduced in CORD-19 from version 6. 
 - full consolidation of the bibliographical references with publisher metadata, DOI, PMID, PMC ID, etc. when available
 - consolidation of article metadata with CrossRef and PubMed aggregations for the entries 
 
