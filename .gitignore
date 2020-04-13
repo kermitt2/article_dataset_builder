@@ -19,5 +19,5 @@ consolidated_metadata.json
 test.py
 resources/*
 !resources/.gitkeep 
-!resources/elsevier_covid_map_23_03_2020.csv.gz
+!resources/elsevier_covid_map_12_04_2020.csv.gz
 !resources/build_elsevier_map.py 
