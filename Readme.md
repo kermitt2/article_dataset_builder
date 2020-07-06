@@ -104,6 +104,8 @@ optional arguments:
                    transformation process
   --dump           write all the consolidated metadata in json in the file
                    consolidated_metadata.json
+  --download       only download the raw files (PDF, NLM/JATS) without 
+                   processing them
 ```
 
 Fill the file `config.json` with relevant service and parameter url, then install the python mess:
@@ -125,7 +127,7 @@ python3 harvest.py --pmids test/pmids.txt
 python3 harvest.py --pmcids test/pmcids.txt 
 ```
 
-For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-27/metadata.csv) (last update 27.03.2020) file by running: 
+For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/historical_releases.html) (last tested version from 2020-06-29) file by running: 
 
 ```console
 python3 harvest.py --cord19 metadata.csv  
@@ -229,7 +231,7 @@ mget *
 "cord19_elsevier_pdf_path": "/the/path/to/the/pdf"
 ```
 
-That's it. The file `./elsevier_covid_map_23_03_2020.csv.gz` contains a map of DOI and PII (the Elsevier article identifiers) for these OA articles. 
+That's it. The file `./elsevier_covid_map_28_06_2020.csv.gz` contains a map of DOI and PII (the Elsevier article identifiers) for these OA articles. 
 
 ### Results with CORD-19
 

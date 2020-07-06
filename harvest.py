@@ -40,7 +40,10 @@ class Harverster(object):
     Usage: see the Readme.md file
     """
 
-    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False):
+    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False, only_download=False):
+        # boolean indicating if we only want to download the raw files without structuring them into XML
+        self.only_download = only_download
+
         self.config = None   
         self._load_config(config_path)
 
@@ -86,14 +89,15 @@ class Harverster(object):
         config_json = open(path).read()
         self.config = json.loads(config_json)
 
-        # test if GROBID is up and running...
-        the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
-        the_url += "isalive"
-        r = requests.get(the_url)
-        if r.status_code != 200:
-            print('GROBID server does not appear up and running ' + str(r.status_code))
-        else:
-            print("GROBID server is up and running")
+        # test if GROBID is up and running, except if we just want to download raw files
+        if not self.only_download:
+            the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
+            the_url += "isalive"
+            r = requests.get(the_url)
+            if r.status_code != 200:
+                print('GROBID server does not appear up and running ' + str(r.status_code))
+            else:
+                print("GROBID server is up and running")
 
     def _init_local_file_map(self):
         # build the local file map, if any, for the Elsevier COVID-19 OA set
@@ -101,8 +105,8 @@ class Harverster(object):
         if self.config["cord19_elsevier_pdf_path"] is not None and len(self.config["cord19_elsevier_pdf_path"])>0 and self.elsevier_oa_map is None:
             # init map
             self.elsevier_oa_map = {}
-            if os.path.isfile(os.path.join(self.resource_path, "elsevier_covid_map_23_03_2020.csv.gz")):
-                with gzip.open(os.path.join(self.resource_path, "elsevier_covid_map_23_03_2020.csv.gz"), mode="rt") as csv_file:
+            if os.path.isfile(os.path.join(self.resource_path, "elsevier_covid_map_28_06_2020.csv.gz")):
+                with gzip.open(os.path.join(self.resource_path, "elsevier_covid_map_28_06_2020.csv.gz"), mode="rt") as csv_file:
                     csv_reader = csv.DictReader(csv_file)
                     for row in csv_reader:
                         if row["doi"] is not None and len(row["doi"])>0:
@@ -669,10 +673,10 @@ class Harverster(object):
             localJson["license-simplified"] = row["license"]
         if row["abstract"] is not None and len(row["abstract"])>0:
             localJson["abstract"] = row["abstract"]
-        if row["Microsoft Academic Paper ID"] is not None and len(row["Microsoft Academic Paper ID"])>0:    
-            localJson["MAG_ID"] = row["Microsoft Academic Paper ID"]
-        if row["WHO #Covidence"] is not None and len(row["WHO #Covidence"])>0:      
-            localJson["WHO_Covidence"] = row["WHO #Covidence"]
+        if row["mag_id"] is not None and len(row["mag_id"])>0:    
+            localJson["MAG_ID"] = row["mag_id"]
+        if row["who_covidence_id"] is not None and len(row["who_covidence_id"])>0:      
+            localJson["WHO_Covidence"] = row["who_covidence_id"]
         
         if 'DOI' not in localJson and row["doi"] is not none and len(row["doi"])>0:
             localJson['DOI'] = row["doi"]
@@ -687,6 +691,8 @@ class Harverster(object):
             localJson['pmcid'] = row["pmcid"]
         if row["pubmed_id"] is not None and len(row["pubmed_id"])>0 and 'pmid' not in localJson:
             localJson['pmid'] = row["pubmed_id"]
+        if row["arxiv_id"] is not None and len(row["arxiv_id"])>0 and 'arxiv_id' not in localJson:
+            localJson['arxiv_id'] = row["arxiv_id"]
 
         localJson = _initProcessStateInformation(localJson)
 
@@ -769,8 +775,8 @@ class Harverster(object):
                     if _is_valid_file(pdf_filename, "pdf"):
                         localJson["has_valid_pdf"] = True
 
-        # GROBIDification if PDF available 
-        if not localJson["has_valid_tei"]:
+        # GROBIDification if PDF available and we don't limit ourself to just download
+        if not localJson["has_valid_tei"] and not self.only_download:
             tei_filename = os.path.join(self.config["data_path"], identifier+".grobid.tei.xml")
             annotation_filename = None
             if self.annotation:
@@ -1305,6 +1311,7 @@ if __name__ == "__main__":
     parser.add_argument("--diagnostic", action="store_true", help="perform a full consistency diagnostic on the harvesting and transformation process") 
     #parser.add_argument("--sample", type=int, default=None, help="harvest only a random sample of indicated size")
     parser.add_argument("--dump", action="store_true", help="write all the consolidated metadata in json in the file consolidated_metadata.json") 
+    parser.add_argument("--download", action="store_true", help="only download the raw files (PDF, NLM/JATS) without processing them") 
 
     args = parser.parse_args()
 
@@ -1319,9 +1326,15 @@ if __name__ == "__main__":
     annotation = args.annotation
     reprocess = args.reprocess
     full_diagnostic = args.diagnostic
+    only_download = args.download
     #sample = args.sample
 
-    harvester = Harverster(config_path=config_path, thumbnail=thumbnail, sample=None, dump_metadata=dump, annotation=annotation)
+    harvester = Harverster(config_path=config_path, 
+        thumbnail=thumbnail, 
+        sample=None, 
+        dump_metadata=dump, 
+        annotation=annotation, 
+        only_download=only_download)
 
     if reset:
         if input("You asked to reset the existing harvesting, this will removed all the already downloaded data files... are you sure? (y/n) ") == "y":
