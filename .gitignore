@@ -20,4 +20,5 @@ test.py
 resources/*
 !resources/.gitkeep 
 !resources/elsevier_covid_map_28_06_2020.csv.gz
+!resources/elsevier_covid_map_20_09_2020.csv.gz
 !resources/build_elsevier_map.py 
