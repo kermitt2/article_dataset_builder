@@ -247,7 +247,7 @@ Here are the results regarding the CORD-19 from __2020-09-11__ ([cord-19_2020-09
 | entries with valid OA URL | - | 141,142 |
 | entries with successfully downloaded PDF | - | 139,565 | 
 | entries with structured full texts via GROBID | 94,541 (PDF JSON) | 138,440 (TEI XML) |
-| entries with structured full texts via PMC JATS | 77,115 | 104,288 |
+| entries with structured full texts via PMC JATS | 77,115 (PMC JSON) | 104,288 (TEI XML) |
 | __total entries with at least one structured full text__ | __103,587 (PDF JSON or PMC JSON)__ | __140,322 (TEI XML)__ |
 
 Other information for this harvester: 
@@ -258,11 +258,13 @@ Other information for this harvester:
 
 Other main differences include:
 
-- the XML TEI contain much richer structured full text, 
+- the XML TEI contain richer structured full text (section titles, notes, formulas, etc.), 
 - usage of up-to-date GROBID models for PDF conversion (with extra medRxiv and bioRxiv training data), 
 - PMC JATS files conversion with [Pub2TEI](https://github.com/kermitt2/Pub2TEI) (normally without information loss because the TEI custumization we are using superseeds the structures covered by JATS). Note that a conversion from PMC JATS files has been introduced in CORD-19 from version 6. 
 - full consolidation of the bibliographical references with publisher metadata, DOI, PMID, PMC ID, etc. when available
 - consolidation of article metadata with CrossRef and PubMed aggregations for the entries 
+- optional coordinates of structures on the original PDF
+- optional thumbnails for article preview
 
 ## Converting the PMC XML JATS files into XML TEI
 

@@ -377,7 +377,7 @@ class Harverster(object):
             the_data = {}
             the_data['generateIDs'] = '1'
             the_data['consolidateHeader'] = '1'
-            the_data['consolidateCitations'] = '0'   
+            the_data['consolidateCitations'] = '1'   
             the_data['includeRawCitations'] = '1'
 
             r = requests.request(
