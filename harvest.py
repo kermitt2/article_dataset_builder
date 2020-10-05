@@ -105,8 +105,8 @@ class Harverster(object):
         if self.config["cord19_elsevier_pdf_path"] is not None and len(self.config["cord19_elsevier_pdf_path"])>0 and self.elsevier_oa_map is None:
             # init map
             self.elsevier_oa_map = {}
-            if os.path.isfile(os.path.join(self.resource_path, "elsevier_covid_map_28_06_2020.csv.gz")):
-                with gzip.open(os.path.join(self.resource_path, "elsevier_covid_map_28_06_2020.csv.gz"), mode="rt") as csv_file:
+            if os.path.isfile(os.path.join(self.resource_path, "elsevier_covid_map_20_09_2020.csv.gz")):
+                with gzip.open(os.path.join(self.resource_path, "elsevier_covid_map_20_09_2020.csv.gz"), mode="rt") as csv_file:
                     csv_reader = csv.DictReader(csv_file)
                     for row in csv_reader:
                         if row["doi"] is not None and len(row["doi"])>0:
@@ -359,6 +359,7 @@ class Harverster(object):
 
     def run_grobid(self, pdf_file, output=None, annotation_output=None):
         # normal fulltext TEI file
+        print("run grobid:", pdf_file, output)
         if output is not None:
             files = {
                 'input': (
@@ -376,7 +377,7 @@ class Harverster(object):
             the_data = {}
             the_data['generateIDs'] = '1'
             the_data['consolidateHeader'] = '1'
-            the_data['consolidateCitations'] = '1'   
+            the_data['consolidateCitations'] = '0'   
             the_data['includeRawCitations'] = '1'
 
             r = requests.request(
@@ -743,7 +744,7 @@ class Harverster(object):
                 try:
                     localUrl = self.unpaywalling_doi(localJson['DOI'])
                 except:
-                    print("Unpaywall API call not succesful")   
+                    print("Unpaywall API call for finding Open URL not succesful")   
                     
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
@@ -760,7 +761,14 @@ class Harverster(object):
 
         # let's try to get this damn PDF
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
-        if not localJson["has_valid_pdf"] or not localJson["has_valid_tei"] or (self.thumbnail and not localJson["has_valid_thumbnail"]):
+        if not os.path.exists(pdf_filename):
+            dest_path = generateStoragePath(identifier)
+            pdf_filename2 = os.path.join(self.config["data_path"], dest_path, identifier+".pdf")
+            if os.path.exists(pdf_filename2):
+                # copy to working area
+                shutil.copyfile(pdf_filename2, pdf_filename)
+
+        if not localJson["has_valid_pdf"]:# or not localJson["has_valid_tei"] or (self.thumbnail and not localJson["has_valid_thumbnail"]):
             if "oaLink" in localJson:
                 localUrl = localJson["oaLink"]
                 if localUrl is not None and len(localUrl)>0:
@@ -1202,7 +1210,7 @@ def _download_requests(url, filename):
 
 def _manage_pmc_archives(filename):
     # check if finename exists and we have downloaded an archive rather than a PDF (case ftp PMC)
-    if os.path.isfile(filename) and filename.endswith(".tar.gz"):
+    if os.path.exists(filename) and os.path.isfile(filename) and filename.endswith(".tar.gz"):
         try:
             # for PMC we still have to extract the PDF from archive
             #print(filename, "is an archive")

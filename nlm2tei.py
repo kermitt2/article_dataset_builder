@@ -115,7 +115,7 @@ class Nlm2tei(object):
             return
 
         for f in os.listdir(temp_dir_out):
-            if f.endswith(".nxml.xml"):
+            if f.endswith(".nxml.xml") or f.endswith(".nxml"):
                 # move the file back to its storage location (which can be S3)
                 identifier = f.split(".")[0]
                 if self.s3 is not None:

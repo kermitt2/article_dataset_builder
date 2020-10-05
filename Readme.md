@@ -9,6 +9,8 @@ Input currently supported:
 - list of PMID in a file, one DOI per line
 - list of PMC ID in a file, one DOI per line
 
+The harvesting is following fair-use (which means that it covers non re-sharable articles) and it is exploiting various Open Access sources. The harvesting thus should result in a close-to-optimal discovery of full texts. For instance, from the same CORD-19 metadata file, the tool can harvest 35.5% more usable full text than available in the CORD-19 dataset (140,322 articles with at least one usable full text versus 103,587 articles with at least one usable full text for the CORD-19 dataset version 2020-09-11), see statistics [here](https://github.com/kermitt2/article-dataset-builder#results-with-cord-19). 
+
 To do:
 - list of ISTEX identifiers or ark, one DOI per line
 - Apache Airflow for the task workflow
@@ -235,26 +237,32 @@ That's it. The file `./elsevier_covid_map_28_06_2020.csv.gz` contains a map of D
 
 ### Results with CORD-19
 
-Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/2020-03-28/metadata.csv)) to illustrate the interest of the tool:
+Here are the results regarding the CORD-19 from __2020-09-11__ ([cord-19_2020-09-11.tar.gz](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/historical_releases/cord-19_2020-09-11.tar.gz)) (4.6GB) to illustrate the interest of the tool. We used the present tool using the CORD-19 metadata file (`metadata.csv`), re-harvested the full texts and converted all into the same target TEI XML format (without information loss with respect to the available publisher XML and GROBID PDF-to-XML conversion). 
 
 |   | official CORD-19 | this harvester |
 |---|---|---|
-| total entries | 45,828 | 45,828 | 
-| entries with valid OA URL | - | 42,742|
-| entries with successfully downloaded PDF | - | 42,362 | 
-| entries with structured full texts via GROBID | ~33,000 (JSON) | 41,070 (TEI XML) |
-| entries with structured full texts via PMC JATS | - | 15,955 (TEI XML) |
-| __total entries with at least one structured full text__ | __~33,000 (JSON)__ | __41,609 (TEI XML)__ |
+| total entries | 253,454 | 253,454 | 
+| without `cord id` duplicates | 241,335 | 241,335 |
+| without all duplicates | - | 161,839 |
+| entries with valid OA URL | - | 141,142 |
+| entries with successfully downloaded PDF | - | 139,565 | 
+| entries with structured full texts via GROBID | 94,541 (PDF JSON) | 138,440 (TEI XML) |
+| entries with structured full texts via PMC JATS | 77,115 | 104,288 |
+| __total entries with at least one structured full text__ | __103,587 (PDF JSON or PMC JSON)__ | __140,322 (TEI XML)__ |
+
+Other information for this harvester: 
+
+- total OA URL not found or invalid: 20,697 (out of the 161,839 distinct articles)
+- 760 GROBID PDF to TEI XML conversion failures (average failure on random downloaded scholar PDF is around 1%)
+- 45 Pub2TEI tranformations reported as containing some kind of failure (NLM (JATS) -> TEI XML)
 
 Other main differences include:
 
-- the XML TEI contain richer structured full text, 
-- usage of more recent GROBID models (with extra medRxiv and bioRxiv training data), 
-- additional PMC JATS files download and conversion with [Pub2TEI](https://github.com/kermitt2/Pub2TEI) (normally without information loss because the TEI custumization we are using superseeds the structures covered by JATS). Note that a conversion from PMC JATS files has been introduced in CORD-19 from version 6. 
+- the XML TEI contain much richer structured full text, 
+- usage of up-to-date GROBID models for PDF conversion (with extra medRxiv and bioRxiv training data), 
+- PMC JATS files conversion with [Pub2TEI](https://github.com/kermitt2/Pub2TEI) (normally without information loss because the TEI custumization we are using superseeds the structures covered by JATS). Note that a conversion from PMC JATS files has been introduced in CORD-19 from version 6. 
 - full consolidation of the bibliographical references with publisher metadata, DOI, PMID, PMC ID, etc. when available
 - consolidation of article metadata with CrossRef and PubMed aggregations for the entries 
-
-We will try to re-ingest and update these numbers with version 7 of the dataset! 
 
 ## Converting the PMC XML JATS files into XML TEI
 
@@ -279,7 +287,33 @@ This will apply Pub2TEI (a set of XSLT) to all the harvested `*.nxml` files and 
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pub2tei.tei.xml
 ```
 
-Note that Pub2TEI supports a lot of other publisher's XML formats, so the principle could be extended to transform a lot of different XML formats into a single one (TEI), facilitating further ingestion and process by avoiding to write complicated XML parsers for each case. 
+Note that Pub2TEI supports a lot of other publisher's XML formats (and variants of these formats), so the principle could be extended to transform different publisher XML formats into a single one (TEI), facilitating and centralizing further ingestion and process by avoiding to write complicated XML parsers for each case. 
+
+## Checking CORD-19 dataset coverage
+
+The following script checks the number of duplicated `cord id` (also done by the normal harvester), but also count the number of articles with at least one JSON full text file:
+
+
+```
+usage: check_cord19_coverage.py [-h] [--documents DOCUMENTS]
+                                [--metadata METADATA]
+
+COVIDataset harvester
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --documents DOCUMENTS
+                        path to the CORD-19 uncompressed document dataset
+  --metadata METADATA   path to the CORD-19 CSV metadata file
+```
+
+
+For example:
+
+```
+python3 check_cord19_coverage.py --metadata metadata.csv --documents cord-19/2020-09-11/documents/
+```
+
 
 ## Troubleshooting with imagemagick
 
