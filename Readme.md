@@ -253,15 +253,15 @@ Here are the results regarding the CORD-19 from __2020-09-11__ ([cord-19_2020-09
 Other information for this harvester: 
 
 - total OA URL not found or invalid: 20,697 (out of the 161,839 distinct articles)
-- 760 GROBID PDF to TEI XML conversion failures (average failure on random downloaded scholar PDF is around 1%)
-- 45 Pub2TEI tranformations reported as containing some kind of failure (NLM (JATS) -> TEI XML)
+- 760 GROBID PDF to TEI XML conversion failures (the average failure on random downloaded scholar PDF is normally around 1%, so we are at 0.5% and this is good)
+- 45 Pub2TEI tranformations (NLM (JATS) -> TEI XML) reported as containing some kind of failure 
 
 Other main differences include:
 
 - the XML TEI contain richer structured full text (section titles, notes, formulas, etc.), 
 - usage of up-to-date GROBID models for PDF conversion (with extra medRxiv and bioRxiv training data), 
 - PMC JATS files conversion with [Pub2TEI](https://github.com/kermitt2/Pub2TEI) (normally without information loss because the TEI custumization we are using superseeds the structures covered by JATS). Note that a conversion from PMC JATS files has been introduced in CORD-19 from version 6. 
-- full consolidation of the bibliographical references with publisher metadata, DOI, PMID, PMC ID, etc. when available
+- full consolidation of the bibliographical references with publisher metadata, DOI, PMID, PMC ID, etc. when available (if you are into citation graphs)
 - consolidation of article metadata with CrossRef and PubMed aggregations for the entries 
 - optional coordinates of structures on the original PDF
 - optional thumbnails for article preview
