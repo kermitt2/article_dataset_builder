@@ -286,7 +286,7 @@ python3 nlm2tei.py --config ./my_config.json
 This will apply Pub2TEI (a set of XSLT) to all the harvested `*.nxml` files and add to the document repository a new file TEI file:
 
 ```
-98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pub2tei.tei.xml
+00/0a/je/vz/000ajevz/000ajevz.pub2tei.tei.xml
 ```
 
 Note that Pub2TEI supports a lot of other publisher's XML formats (and variants of these formats), so the principle could be extended to transform different publisher XML formats into a single one (TEI), facilitating and centralizing further ingestion and process by avoiding to write complicated XML parsers for each case. 
