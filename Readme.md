@@ -187,6 +187,8 @@ python3 harvest.py --diagnostic
 
 ## Generated files
 
+### Default 
+
 Structure of the generated files for an article having as UUID identifier `98da17ff-bf7e-4d43-bdf2-4d8d831481e5`
 
 ```
@@ -198,6 +200,7 @@ Optional additional files:
 
 ```
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.nxml
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pub2tei.tei.xml
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-ref-annotations.json
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-small.png
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-medium.png
@@ -207,6 +210,27 @@ Optional additional files:
 The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file.
 
 The `*.nxml` files correspond to the JATS files available for PMC (Open Access set only).
+
+# CORD-19
+
+For the CORD-19 dataset, for simplification and clarity, we reuse the `cord id` which is a random string 8 characters in `[0-9a-z]`: 
+
+```
+00/0a/je/vz/000ajevz/000ajevz.pdf
+00/0a/je/vz/000ajevz/000ajevz.json
+00/0a/je/vz/000ajevz/000ajevz.grobid.tei.xml
+```
+
+Optional additional files:
+
+```
+00/0a/je/vz/000ajevz/000ajevz.nxml
+00/0a/je/vz/000ajevz/000ajevz.pub2tei.tei.xml
+00/0a/je/vz/000ajevz/000ajevz-ref-annotations.json
+00/0a/je/vz/000ajevz/000ajevz-thumb-small.png
+00/0a/je/vz/000ajevz/000ajevz-thumb-medium.png
+00/0a/je/vz/000ajevz/000ajevz-thumb-large.png
+```
 
 ## On harvesting and ingesting the CORD-19 dataset
 
@@ -283,13 +307,13 @@ If a custom config file is used:
 python3 nlm2tei.py --config ./my_config.json
 ```
 
-This will apply Pub2TEI (a set of XSLT) to all the harvested `*.nxml` files and add to the document repository a new file TEI file:
+This will apply Pub2TEI (a set of XSLT) to all the harvested `*.nxml` files and add to the document repository a new file TEI file, for instance for a CORD-19 entry:
 
 ```
 00/0a/je/vz/000ajevz/000ajevz.pub2tei.tei.xml
 ```
 
-Note that Pub2TEI supports a lot of other publisher's XML formats (and variants of these formats), so the principle could be extended to transform different publisher XML formats into a single one (TEI), facilitating and centralizing further ingestion and process by avoiding to write complicated XML parsers for each case. 
+Note that Pub2TEI supports a lot of other publisher's XML formats (and variants of these formats), so the principle and current tool could be used to transform different publisher XML formats into a single one (TEI) - not just NLM/JATS, facilitating and centralizing further ingestion and process by avoiding to write complicated XML parsers for each case. 
 
 ## Checking CORD-19 dataset coverage
 
