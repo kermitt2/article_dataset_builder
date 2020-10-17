@@ -725,11 +725,13 @@ class Harverster(object):
         if 'doi' in row and 'DOI' not in localJson and row["doi"] is not none and len(row["doi"])>0:
             localJson['DOI'] = row["doi"]
         
+        '''
         if 'DOI' in localJson:
             print("processing", localJson['DOI'], "as", identifier)
         else:
             print("processing", identifier)
-
+        '''
+        
         # add possible missing information in the metadata entry
         if "pmcid" in row and row["pmcid"] is not None and len(row["pmcid"])>0 and 'pmcid' not in localJson:
             localJson['pmcid'] = row["pmcid"]
@@ -804,15 +806,6 @@ class Harverster(object):
 
         # let's try to get this damn PDF
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
-        '''
-        if localJson["has_valid_pdf"] and not os.path.exists(pdf_filename):
-            dest_path = generateStoragePath(identifier)
-            pdf_filename2 = os.path.join(self.config["data_path"], dest_path, identifier+".pdf")
-            if os.path.exists(pdf_filename2):
-                # copy to working area
-                shutil.copyfile(pdf_filename2, pdf_filename)
-        '''
-
         if not localJson["has_valid_pdf"]:
             if "oaLink" in localJson:
                 localUrl = localJson["oaLink"]
