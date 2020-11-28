@@ -40,9 +40,10 @@ class Harverster(object):
     Usage: see the Readme.md file
     """
 
-    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False, only_download=False):
+    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False, only_download=False, full_diagnostic=False):
         # boolean indicating if we only want to download the raw files without structuring them into XML
         self.only_download = only_download
+        self.full_diagnostic = full_diagnostic
 
         self.config = None   
         self._load_config(config_path)
@@ -90,7 +91,7 @@ class Harverster(object):
         self.config = json.loads(config_json)
 
         # test if GROBID is up and running, except if we just want to download raw files
-        if not self.only_download:
+        if not self.only_download and not self.full_diagnostic:
             the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
             the_url += "isalive"
             r = requests.get(the_url)
@@ -467,12 +468,11 @@ class Harverster(object):
                 the_doi = line.strip()
                 the_doi = _clean_doi(the_doi)
                 # check if the entry has already been processed
-                if self.getUUIDByStrongIdentifier(the_doi) is not None:
-                    line_count += 1
-                    continue
+                identifier = self.getUUIDByStrongIdentifier(the_doi)
+                if identifier is None:
+                    # we need a new identifier
+                    identifier = str(uuid.uuid4())
 
-                # we need a new identifier
-                identifier = str(uuid.uuid4())
                 identifiers.append(identifier)
                 dois.append(the_doi)
     
@@ -510,6 +510,8 @@ class Harverster(object):
                 # check if the entry has already been processed
                 # we can use from 27.03.2020 update the cord_uid as identifier, and keep doi of course as fallback
                 # we don't use the sha as identifier, just keep it in the metadata
+                
+                '''
                 if row["cord_uid"] and len(row["cord_uid"])>0:
                     # in the current version, there is always a cord_uid normally
                     if self.getUUIDByStrongIdentifier(row["cord_uid"]) is not None:
@@ -519,6 +521,7 @@ class Harverster(object):
                     if self.getUUIDByStrongIdentifier(row["doi"]) is not None:
                         line_count += 1
                         continue
+                '''
 
                 # we use cord_uid as identifier
                 identifier = row["cord_uid"]
@@ -556,12 +559,11 @@ class Harverster(object):
 
                 the_pmid = line.strip()
                 # check if the entry has already been processed
-                if self.getUUIDByStrongIdentifier(the_pmid) is not None:
-                    line_count += 1
-                    continue
-
-                # we need a new identifier
-                identifier = str(uuid.uuid4())
+                identifier = self.getUUIDByStrongIdentifier(the_pmid)
+                if identifier is None:
+                    # we need a new identifier
+                    identifier = str(uuid.uuid4())
+                
                 identifiers.append(identifier)
                 pmids.append(the_pmid)
     
@@ -599,12 +601,11 @@ class Harverster(object):
                     continue
 
                 # check if the entry has already been processed
-                if self.getUUIDByStrongIdentifier(the_pmcid) is not None:
-                    line_count += 1
-                    continue
+                identifier = self.getUUIDByStrongIdentifier(the_pmcid)
+                if identifier is None:
+                    # we need a new identifier
+                    identifier = str(uuid.uuid4())
 
-                # we need a new identifier
-                identifier = str(uuid.uuid4())
                 identifiers.append(identifier)
                 pmcids.append(the_pmcid)
     
@@ -619,7 +620,17 @@ class Harverster(object):
             print("processed", str(line_count), "article PMC ID")
 
     def processEntryDOI(self, identifier, doi):
-        localJson = self.biblio_glutton_lookup(doi=doi, pmcid=None, pmid=None, istex_id=None, istex_ark=None)
+        localJson = None        
+
+        # if the entry has already been processed (partially or completely), we reuse the entry 
+        with self.env_entries.begin(write=False) as txn:
+            value = txn.get(identifier.encode(encoding='UTF-8'))
+            if value is not None:
+                localJson = _deserialize_pickle(value)
+
+        if localJson is None:
+            localJson = self.biblio_glutton_lookup(doi=doi, pmcid=None, pmid=None, istex_id=None, istex_ark=None)
+        
         if localJson is None:
             localJson = {}
         localJson['DOI'] = doi
@@ -632,7 +643,17 @@ class Harverster(object):
         self.processTask(localJson)
 
     def processEntryPMID(self, identifier, pmid):
-        localJson = self.biblio_glutton_lookup(doi=None, pmcid=None, pmid=pmid, istex_id=None, istex_ark=None)
+        localJson = None        
+
+        # if the entry has already been processed (partially or completely), we reuse the entry 
+        with self.env_entries.begin(write=False) as txn:
+            value = txn.get(identifier.encode(encoding='UTF-8'))
+            if value is not None:
+                localJson = _deserialize_pickle(value)
+
+        if localJson is None:
+            localJson = self.biblio_glutton_lookup(doi=None, pmcid=None, pmid=pmid, istex_id=None, istex_ark=None)
+        
         if localJson is None:
             localJson = {}
         localJson['pmid'] = pmid
@@ -645,7 +666,17 @@ class Harverster(object):
         self.processTask(localJson)
 
     def processEntryPMCID(self, identifier, pmcid):
-        localJson = self.biblio_glutton_lookup(doi=None, pmcid=pmcid, pmid=None, istex_id=None, istex_ark=None)
+        localJson = None        
+
+        # if the entry has already been processed (partially or completely), we reuse the entry 
+        with self.env_entries.begin(write=False) as txn:
+            value = txn.get(identifier.encode(encoding='UTF-8'))
+            if value is not None:
+                localJson = _deserialize_pickle(value)
+
+        if localJson is None:
+            localJson = self.biblio_glutton_lookup(doi=None, pmcid=pmcid, pmid=None, istex_id=None, istex_ark=None)
+
         if localJson is None:
             localJson = {}
         localJson['pmcid'] = pmcid
@@ -660,43 +691,57 @@ class Harverster(object):
     def processEntryCord19(self, identifier, row):
         # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
         # WHO #Covidence,has_full_text,full_text_file,url  
-        try:    
-            localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
-        except:
-            print("biblio-glutton call fails")
-            localJson = None
+        localJson = None        
+
+        # if the entry has already been processed (partially or completely), we reuse the entry 
+        with self.env_entries.begin(write=False) as txn:
+            value = txn.get(identifier.encode(encoding='UTF-8'))
+            if value is not None:
+                localJson = _deserialize_pickle(value)
+                    
+        if localJson is None:
+            try:    
+                localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
+            except:
+                print("biblio-glutton call fails")
+                localJson = None
 
         if localJson is None:
             localJson = {}
             localJson['title'] = row["title"]
             localJson['year']= row["publish_time"]
-        
+
+        # in the case of CORD-19, we can refresh some metadata even if the entry has already been processed, so that we can update
+        # the loaded set from one weekly release to another one 
         localJson["id"] = identifier
+
         # add the CORD-19 sha, though it won't be used
-        localJson["cord_sha"] = row["sha"]
-        if row["license"] is not None and len(row["license"])>0:
+        if "sha" in row:
+            localJson["cord_sha"] = row["sha"]
+        if "license" in row and row["license"] is not None and len(row["license"])>0:
             localJson["license-simplified"] = row["license"]
-        if row["abstract"] is not None and len(row["abstract"])>0:
+        if "abstract" in row and row["abstract"] is not None and len(row["abstract"])>0:
             localJson["abstract"] = row["abstract"]
-        if row["mag_id"] is not None and len(row["mag_id"])>0:    
+        if "mag_id" in row and row["mag_id"] is not None and len(row["mag_id"])>0:    
             localJson["MAG_ID"] = row["mag_id"]
-        if row["who_covidence_id"] is not None and len(row["who_covidence_id"])>0:      
+        if "who_covidence_id" in row and row["who_covidence_id"] is not None and len(row["who_covidence_id"])>0:      
             localJson["WHO_Covidence"] = row["who_covidence_id"]
-        
-        if 'DOI' not in localJson and row["doi"] is not none and len(row["doi"])>0:
+        if 'doi' in row and 'DOI' not in localJson and row["doi"] is not none and len(row["doi"])>0:
             localJson['DOI'] = row["doi"]
         
+        '''
         if 'DOI' in localJson:
             print("processing", localJson['DOI'], "as", identifier)
         else:
             print("processing", identifier)
-
+        '''
+        
         # add possible missing information in the metadata entry
-        if row["pmcid"] is not None and len(row["pmcid"])>0 and 'pmcid' not in localJson:
+        if "pmcid" in row and row["pmcid"] is not None and len(row["pmcid"])>0 and 'pmcid' not in localJson:
             localJson['pmcid'] = row["pmcid"]
-        if row["pubmed_id"] is not None and len(row["pubmed_id"])>0 and 'pmid' not in localJson:
+        if "pubmed_id" in row and row["pubmed_id"] is not None and len(row["pubmed_id"])>0 and 'pmid' not in localJson:
             localJson['pmid'] = row["pubmed_id"]
-        if row["arxiv_id"] is not None and len(row["arxiv_id"])>0 and 'arxiv_id' not in localJson:
+        if "arxiv_id" in row and row["arxiv_id"] is not None and len(row["arxiv_id"])>0 and 'arxiv_id' not in localJson:
             localJson['arxiv_id'] = row["arxiv_id"]
 
         localJson = _initProcessStateInformation(localJson)
@@ -763,18 +808,11 @@ class Harverster(object):
                 localJson["has_valid_oa_url"] = True
 
         if "oaLink" in localJson:
-            print(localJson["oaLink"])
+            print("OA link:", localJson["oaLink"])
 
         # let's try to get this damn PDF
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
-        if not os.path.exists(pdf_filename):
-            dest_path = generateStoragePath(identifier)
-            pdf_filename2 = os.path.join(self.config["data_path"], dest_path, identifier+".pdf")
-            if os.path.exists(pdf_filename2):
-                # copy to working area
-                shutil.copyfile(pdf_filename2, pdf_filename)
-
-        if not localJson["has_valid_pdf"]:# or not localJson["has_valid_tei"] or (self.thumbnail and not localJson["has_valid_thumbnail"]):
+        if not localJson["has_valid_pdf"]:
             if "oaLink" in localJson:
                 localUrl = localJson["oaLink"]
                 if localUrl is not None and len(localUrl)>0:
@@ -797,6 +835,9 @@ class Harverster(object):
                 annotation_filename = os.path.join(self.config["data_path"], identifier+"-ref-annotations.json")
             if localJson["has_valid_pdf"]:
                 # GROBIDification with full biblio consolidation
+                if not os.path.exists(pdf_filename):
+                    dest_path = generateStoragePath(identifier)
+                    pdf_filename = os.path.join(self.config["data_path"], dest_path, identifier+".pdf")
                 try:
                     self.run_grobid(pdf_filename, tei_filename, annotation_filename)
                 except:
@@ -809,6 +850,9 @@ class Harverster(object):
         # thumbnail if requested 
         if not localJson["has_valid_thumbnail"] and self.thumbnail:
             if localJson["has_valid_pdf"]:
+                if not os.path.exists(pdf_filename):
+                    dest_path = generateStoragePath(identifier)
+                    pdf_filename = os.path.join(self.config["data_path"], dest_path, identifier+".pdf")
                 generate_thumbnail(pdf_filename)
                 if _is_valid_file(pdf_filename.replace('.pdf', '-thumb-small.png'), "png"):
                     localJson["has_valid_thumbnail"] = True
@@ -1116,11 +1160,16 @@ def _is_valid_file(file, mime_type):
 
 def _initProcessStateInformation(json_entry):
     # init process information
-    json_entry["has_valid_pdf"] = False
-    json_entry["has_valid_oa_url"] = False
-    json_entry["has_valid_tei"] = False
-    json_entry["has_valid_ref_annotation"] = False
-    json_entry["has_valid_thumbnail"] = False
+    if not "has_valid_pdf" in json_entry:
+        json_entry["has_valid_pdf"] = False
+    if not "has_valid_oa_url" in json_entry:
+        json_entry["has_valid_oa_url"] = False
+    if not "has_valid_tei" in json_entry:
+        json_entry["has_valid_tei"] = False
+    if not "has_valid_ref_annotation" in json_entry:
+        json_entry["has_valid_ref_annotation"] = False
+    if not "has_valid_thumbnail" in json_entry:
+        json_entry["has_valid_thumbnail"] = False
     return json_entry
 
 def _biblio_glutton_url(biblio_glutton_base, biblio_glutton_port):
@@ -1348,7 +1397,8 @@ if __name__ == "__main__":
         sample=None, 
         dump_metadata=dump, 
         annotation=annotation, 
-        only_download=only_download)
+        only_download=only_download,
+        full_diagnostic=full_diagnostic)
 
     if reset:
         if input("You asked to reset the existing harvesting, this will removed all the already downloaded data files... are you sure? (y/n) ") == "y":
@@ -1358,7 +1408,11 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    if reprocess:
+    if full_diagnostic:
+        harvester.diagnostic(full=full_diagnostic)
+    elif dump :
+        harvester.dump_metadata()
+    elif reprocess:
         harvester.reprocessFailed()        
     elif csv_cord19:
         if not os.path.isfile(csv_cord19):
@@ -1380,11 +1434,6 @@ if __name__ == "__main__":
             print("error: the indicated PMC ID file path is not valid:", pmcids_path)
             sys.exit(0)    
         harvester.harvest_pmcids(pmcids_path)
-
-    harvester.diagnostic(full=full_diagnostic)
-
-    if dump :
-        harvester.dump_metadata()
 
     runtime = round(time.time() - start_time, 3)
     print("runtime: %s seconds " % (runtime))
