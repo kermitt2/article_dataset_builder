@@ -587,13 +587,17 @@ class Harverster(object):
 
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                        executor.map(self.processEntryPMCID, identifiers, pmids)
+                        executor.map(self.processEntryPMCID, identifiers, pmcids)
                     # reinit
                     i = 0
                     identifiers = []
                     pmcids = []
 
                 the_pmcid = line.strip()
+
+                if the_pmcid == 'pmc':
+                    continue
+
                 # check if the entry has already been processed
                 if self.getUUIDByStrongIdentifier(the_pmcid) is not None:
                     line_count += 1
@@ -618,7 +622,7 @@ class Harverster(object):
         localJson = self.biblio_glutton_lookup(doi=doi, pmcid=None, pmid=None, istex_id=None, istex_ark=None)
         if localJson is None:
             localJson = {}
-            localJson['DOI'] = doi
+        localJson['DOI'] = doi
         localJson["id"] = identifier
 
         print("processing", localJson['DOI'], "as", identifier)
@@ -631,7 +635,7 @@ class Harverster(object):
         localJson = self.biblio_glutton_lookup(doi=None, pmcid=None, pmid=pmid, istex_id=None, istex_ark=None)
         if localJson is None:
             localJson = {}
-            localJson['pmid'] = pmid
+        localJson['pmid'] = pmid
         localJson["id"] = identifier
 
         print("processing", localJson['pmid'], "as", identifier)
@@ -644,7 +648,7 @@ class Harverster(object):
         localJson = self.biblio_glutton_lookup(doi=None, pmcid=pmcid, pmid=None, istex_id=None, istex_ark=None)
         if localJson is None:
             localJson = {}
-            localJson['pmcid'] = pmcid
+        localJson['pmcid'] = pmcid
         localJson["id"] = identifier
 
         print("processing", localJson['pmcid'], "as", identifier)
@@ -724,6 +728,8 @@ class Harverster(object):
             # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
             if "pmcid" in localJson:
                 localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
+                if localUrl is None:
+                    print("no PMC oa valid url:", localJson["pmcid"])
 
             if localUrl is None:
                 # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
