@@ -21,8 +21,11 @@ import time
 import uuid
 import lmdb
 from tqdm import tqdm
+import logging
+import logging.handlers
 
 map_size = 100 * 1024 * 1024 * 1024 
+logging.basicConfig(filename='harvester.log', filemode='w', level=logging.DEBUG)
 
 class Harverster(object):
     """
@@ -96,9 +99,9 @@ class Harverster(object):
             the_url += "isalive"
             r = requests.get(the_url)
             if r.status_code != 200:
-                print('GROBID server does not appear up and running ' + str(r.status_code))
+                logging.warning('GROBID server does not appear up and running ' + str(r.status_code))
             else:
-                print("GROBID server is up and running")
+                logging.info("GROBID server is up and running")
 
     def _init_local_file_map(self):
         # build the local file map, if any, for the Elsevier COVID-19 OA set
@@ -121,9 +124,9 @@ class Harverster(object):
             try:  
                 os.makedirs(self.config["data_path"])
             except OSError:  
-                print ("Creation of the directory %s failed" % self.config["data_path"])
+                logging.warning("Creation of the directory %s failed" % self.config["data_path"])
             else:  
-                print ("Successfully created the directory %s" % self.config["data_path"])
+                logging.info("Successfully created the directory %s" % self.config["data_path"])
 
         # open in write mode
         envFilePath = os.path.join(self.config["data_path"], 'entries')
@@ -139,7 +142,7 @@ class Harverster(object):
         if not os.path.isfile(resource_file):
             # TBD: if the file is not present we should download it at ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
             url = "ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt"
-            print("Downloading PMC resource file:", url)
+            logging.debug("Downloading PMC resource file: " + url)
             _download(url, resource_file)
 
         envFilePath = os.path.join(self.resource_path, 'pmc_oa')
@@ -155,7 +158,7 @@ class Harverster(object):
                     nb_lines += 1
 
             # fill this lmdb map
-            print("building PMC resource map")
+            print("building PMC resource map - done only one time")
             with open(resource_file, "r") as fp:
                 count = 0
                 for line in tqdm(fp, total=nb_lines):
@@ -240,7 +243,7 @@ class Harverster(object):
                     try:
                         pmc_info = _deserialize_pickle(pmc_info_object)
                     except:
-                        print("omg _deserialize_pickle failed?")
+                        logging.error("omg _deserialize_pickle failed?")
                     if "license" in pmc_info:
                         license = pmc_info["license"]
                         license = license.replace("\n","")
@@ -250,7 +253,7 @@ class Harverster(object):
                         subpath = pmc_info["subpath"];
                         return os.path.join(self.config["pmc_base_ftp"],subpath), license
         except lmdb.Error:
-            print("lmdb pmc os look-up failed")
+            logging.error("lmdb pmc os look-up failed")
         return None, None
 
     def biblio_glutton_lookup(self, doi=None, pmcid=None, pmid=None, istex_id=None, istex_ark=None):
@@ -322,7 +325,7 @@ class Harverster(object):
                 try:
                     shutil.rmtree(path)
                 except OSError as e:
-                    print("Error: %s - %s." % (e.filename, e.strerror))
+                    logging.error("Error: %s - %s." % (e.filename, e.strerror))
 
         # clean the metadata file if present
         if self.dump_file: 
@@ -360,7 +363,7 @@ class Harverster(object):
 
     def run_grobid(self, pdf_file, output=None, annotation_output=None):
         # normal fulltext TEI file
-        print("run grobid:", pdf_file, output)
+        logging.debug("run grobid:", pdf_file, output)
         if output is not None:
             files = {
                 'input': (
@@ -395,14 +398,14 @@ class Harverster(object):
                 time.sleep(self.config['sleep_time'])
                 return self.process_pdf(pdf_file, output, None)
             elif status != 200:
-                print('Processing failed with error ' + str(status))
+                logging.error('Processing failed with error ' + str(status))
             else:
                 # writing TEI file
                 try:
                     with io.open(output,'w',encoding='utf8') as tei_file:
                         tei_file.write(r.text)
                 except OSError:  
-                   print ("Writing resulting TEI XML file %s failed" % output)
+                   logging.error("Writing resulting TEI XML file %s failed" % output)
 
         # reference annotation file
         if annotation_output is not None:
@@ -437,14 +440,14 @@ class Harverster(object):
                 time.sleep(self.config['sleep_time'])
                 return self.process_pdf(pdf_file, None, annotation_output)
             elif status != 200:
-                print('Processing failed with error ' + str(status))
+                logging.error('Processing failed with error ' + str(status))
             else:
                 # writing TEI file
                 try:
                     with io.open(annotation_output,'w',encoding='utf8') as json_file:
                         json_file.write(r.text)
                 except OSError:  
-                   print ("Writing resulting JSON file %s failed" % annotation_output)
+                   logging.error("Writing resulting JSON file %s failed" % annotation_output)
 
     def harvest_dois(self, dois_file):
         with open(dois_file, 'rt') as fp:
@@ -488,15 +491,24 @@ class Harverster(object):
             print("processed", str(line_count), "articles")
 
     def harvest_cord19(self, metadata_csv_file):
+        # first get the number of entries to be able to display a progress bar
+        total_entries = 0
+        with open(metadata_csv_file, mode='r') as csv_file:
+            csv_reader = csv.DictReader(csv_file)
+            for row in csv_reader:
+                total_entries += 1
+
+        # format is: 
         # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
         # WHO #Covidence,has_full_text,full_text_file,url
+        print("harvesting CORD-19 full texts")
         with open(metadata_csv_file, mode='r') as csv_file:
             csv_reader = csv.DictReader(csv_file)
             line_count = 0 # total count of articles
             i = 0 # counter for article per batch
             identifiers = []
             rows = []
-            for row in csv_reader:
+            for row in tqdm(csv_reader, total=total_entries):
 
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
@@ -511,17 +523,15 @@ class Harverster(object):
                 # we can use from 27.03.2020 update the cord_uid as identifier, and keep doi of course as fallback
                 # we don't use the sha as identifier, just keep it in the metadata
                 
-                '''
                 if row["cord_uid"] and len(row["cord_uid"])>0:
                     # in the current version, there is always a cord_uid normally
                     if self.getUUIDByStrongIdentifier(row["cord_uid"]) is not None:
                         line_count += 1
                         continue
-                elif row["doi"] and len(row["doi"])>0:
+                if row["doi"] and len(row["doi"])>0:
                     if self.getUUIDByStrongIdentifier(row["doi"]) is not None:
                         line_count += 1
                         continue
-                '''
 
                 # we use cord_uid as identifier
                 identifier = row["cord_uid"]
@@ -636,7 +646,7 @@ class Harverster(object):
         localJson['DOI'] = doi
         localJson["id"] = identifier
 
-        print("processing", localJson['DOI'], "as", identifier)
+        logging.debug("processing " + localJson['DOI'] + " as " + identifier)
 
         localJson = _initProcessStateInformation(localJson)
         self.updateIdentifierMap(localJson)
@@ -659,7 +669,7 @@ class Harverster(object):
         localJson['pmid'] = pmid
         localJson["id"] = identifier
 
-        print("processing", localJson['pmid'], "as", identifier)
+        logging.debug("processing " + localJson['pmid'] + " as " + identifier)
 
         localJson = _initProcessStateInformation(localJson)
         self.updateIdentifierMap(localJson)
@@ -682,7 +692,7 @@ class Harverster(object):
         localJson['pmcid'] = pmcid
         localJson["id"] = identifier
 
-        print("processing", localJson['pmcid'], "as", identifier)
+        logging.debug("processing " + localJson['pmcid'] + " as " + identifier)
 
         localJson = _initProcessStateInformation(localJson)
         self.updateIdentifierMap(localJson)
@@ -703,7 +713,7 @@ class Harverster(object):
             try:    
                 localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
             except:
-                print("biblio-glutton call fails")
+                logging.debug("biblio-glutton call fails")
                 localJson = None
 
         if localJson is None:
@@ -728,13 +738,6 @@ class Harverster(object):
             localJson["WHO_Covidence"] = row["who_covidence_id"]
         if 'doi' in row and 'DOI' not in localJson and row["doi"] is not none and len(row["doi"])>0:
             localJson['DOI'] = row["doi"]
-        
-        '''
-        if 'DOI' in localJson:
-            print("processing", localJson['DOI'], "as", identifier)
-        else:
-            print("processing", identifier)
-        '''
         
         # add possible missing information in the metadata entry
         if "pmcid" in row and row["pmcid"] is not None and len(row["pmcid"])>0 and 'pmcid' not in localJson:
@@ -763,6 +766,11 @@ class Harverster(object):
         if "pmid" in localJson:
             with self.env_uuid.begin(write=True) as txn_uuid:
                 txn_uuid.put(localJson['pmid'].encode(encoding='UTF-8'), localJson["id"].encode(encoding='UTF-8'))
+        # store the identifier itself too, for keeping track of already seen identifiers
+        if "id" in localJson:
+            with self.env_uuid.begin(write=True) as txn_uuid:
+                txn_uuid.put(localJson['id'].encode(encoding='UTF-8'), localJson["id"].encode(encoding='UTF-8'))
+
 
     def processTask(self, localJson):
         identifier = localJson["id"]
@@ -774,7 +782,7 @@ class Harverster(object):
             if "pmcid" in localJson:
                 localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
                 if localUrl is None:
-                    print("no PMC oa valid url:", localJson["pmcid"])
+                    logging.debug("no PMC oa valid url: " + localJson["pmcid"])
 
             if localUrl is None:
                 # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
@@ -795,7 +803,7 @@ class Harverster(object):
                 try:
                     localUrl = self.unpaywalling_doi(localJson['DOI'])
                 except:
-                    print("Unpaywall API call for finding Open URL not succesful")   
+                    logging.debug("Unpaywall API call for finding Open URL not succesful")   
                     
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
@@ -808,7 +816,7 @@ class Harverster(object):
                 localJson["has_valid_oa_url"] = True
 
         if "oaLink" in localJson:
-            print("OA link:", localJson["oaLink"])
+            logging.debug("OA link: " + localJson["oaLink"])
 
         # let's try to get this damn PDF
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
@@ -841,7 +849,7 @@ class Harverster(object):
                 try:
                     self.run_grobid(pdf_filename, tei_filename, annotation_filename)
                 except:
-                    print("Grobid call failed")    
+                    logging.debug("Grobid call failed")    
                 if _is_valid_file(tei_filename, "xml"):
                     localJson["has_valid_tei"] = True
                 if self.annotation and _is_valid_file(annotation_filename, "json"):
@@ -938,7 +946,7 @@ class Harverster(object):
                         shutil.copyfile(thumb_file_large, os.path.join(local_dest_path, local_entry['id']+"-thumb-larger.png"))
 
             except IOError as e:
-                print("invalid path", str(e))       
+                logging.error("invalid path " + str(e))       
 
         # clean pdf and thumbnail files
         try:
@@ -960,7 +968,7 @@ class Harverster(object):
                 if os.path.isfile(thumb_file_large): 
                     os.remove(thumb_file_large)
         except IOError as e:
-            print("temporary file cleaning failed:", str(e))    
+            logging.error("temporary file cleaning failed: " + str(e))    
 
     def getUUIDByStrongIdentifier(self, strong_identifier):
         """
@@ -1076,15 +1084,15 @@ class Harverster(object):
                 if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"] or not localJson["has_valid_tei"]:
                     localJsons.append(localJson)
                     i += 1
-                    print("re-processing", localJson["id"])
+                    logging.debug("re-processing " + localJson["id"])
                 elif self.thumbnail and not localJson["has_valid_thumbnail"]:
                     localJsons.append(localJson)
                     i += 1
-                    print("re-processing for thumbnails", localJson["id"])
+                    logging.debug("re-processing for thumbnails " + localJson["id"])
                 elif self.annotation and not localJson["has_valid_ref_annotation"]:
                     localJsons.append(localJson)
                     i += 1
-                    print("re-processing for PDF annotations", localJson["id"])
+                    logging.debug("re-processing for PDF annotations " + localJson["id"])
 
         # we need to process the latest incomplete batch (if not empty)
         if len(localJsons)>0:
@@ -1121,7 +1129,7 @@ def _check_compression(file):
                     try:
                         shutil.copyfileobj(f_in, f_out)
                     except OSError:  
-                        print ("Decompression file failed:", f_in)
+                        logging.error("Decompression file failed: " + f_in)
                     else:
                         success = True
             # replace the file
@@ -1129,14 +1137,14 @@ def _check_compression(file):
                 try:
                     shutil.copyfile(file+'.decompressed', file)
                 except OSError:  
-                    print ("Replacement of decompressed file failed:", file)
+                    logging.error("Replacement of decompressed file failed: " + file)
                     success = False
             # delete the tmp file
             if os.path.isfile(file+'.decompressed'):
                 try:
                     os.remove(file+'.decompressed')
                 except OSError:  
-                    print ("Deletion of temp decompressed file failed:", file+'.decompressed')    
+                    logging.error("Deletion of temp decompressed file failed: " + file+'.decompressed')    
             return success
         else:
             return True
@@ -1206,7 +1214,7 @@ def _download_wget(url, filename):
         '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
         '--no-check-certificate ' + \
         '"' + url + '"'
-    #print(cmd)
+    logging.debug(cmd)
     try:
         result = subprocess.check_call(cmd, shell=True)
         
@@ -1218,31 +1226,30 @@ def _download_wget(url, filename):
                 try:
                     os.remove(filename)
                 except OSError:
-                    print ("Deletion of invalid compressed file failed:", filename) 
+                    logging.error("Deletion of invalid compressed file failed: " + filename) 
                     result = "fail"
             # ensure cleaning
             if os.path.isfile(filename+'.decompressed'):
                 try:
                     os.remove(filename+'.decompressed')
                 except OSError:  
-                    print ("Final deletion of temp decompressed file failed:", filename+'.decompressed')    
+                    logging.error("Final deletion of temp decompressed file failed: " + filename+'.decompressed')    
         else:
             result = "success"
 
     except subprocess.CalledProcessError as e:   
-        print("e.returncode", e.returncode)
-        print("e.output", e.output)
-        print("wget command was: "+cmd)
+        logging.debug("e.returncode " + e.returncode)
+        logging.debug("e.output " + e.output)
+        logging.debug("wget command was: " + cmd)
         #if e.output is not None and e.output.startswith('error: {'):
         if  e.output is not None:
             error = json.loads(e.output[7:]) # Skip "error: "
-            print("error code:", error['code'])
-            print("error message:", error['message'])
+            logging.debug("error code: " + error['code'])
+            logging.debug("error message: " + error['message'])
         result = "fail"
 
     except Exception as e:
-        # a bit of bad practice
-        print("Unexpected error wget process", e)
+        logging.error("Unexpected error wget process" + str(e))
         result = "fail"
 
     return str(result)
@@ -1260,7 +1267,7 @@ def _download_requests(url, filename):
                 f_out.write(file_data.content)
             result = "success"
     except Exception:
-        print("Download failed for {0} with requests".format(url))
+        logging.error("Download failed for {0} with requests".format(url))
     return result
 
 def _manage_pmc_archives(filename):
@@ -1294,7 +1301,7 @@ def _manage_pmc_archives(filename):
                     try:
                         shutil.rmtree(os.path.join(thedir,tmp_subdir))
                     except OSError:  
-                        print ("Deletion of tmp dir failed:", os.path.join(thedir,tmp_subdir))     
+                        logging.error("Deletion of tmp dir failed: " + os.path.join(thedir,tmp_subdir))     
                     #break
                 if member.isfile() and member.name.endswith(".nxml"):
                     member.name = os.path.basename(member.name)
@@ -1310,18 +1317,18 @@ def _manage_pmc_archives(filename):
                     try:
                         shutil.rmtree(os.path.join(thedir,tmp_subdir))
                     except OSError:  
-                        print ("Deletion of tmp dir failed:", os.path.join(thedir,tmp_subdir))      
+                        logging.error("Deletion of tmp dir failed: " + os.path.join(thedir,tmp_subdir))      
             tar.close()
             if not pdf_found:
-                print("warning: no pdf found in archive:", filename)
+                logging.warning("warning: no pdf found in archive: " + filename)
             if os.path.isfile(filename):
                 try:
                     os.remove(filename)
                 except OSError:  
-                    print ("Deletion of PMC archive file failed:", filename) 
+                    logging.error("Deletion of PMC archive file failed: " + filename) 
         except Exception as e:
             # a bit of bad practice
-            print("Unexpected error", e)
+            logging.error("Unexpected error " + str(e))
             pass
 
 def generate_thumbnail(pdfFile):
@@ -1334,21 +1341,21 @@ def generate_thumbnail(pdfFile):
     try:
         subprocess.check_call(cmd, shell=True)
     except subprocess.CalledProcessError as e:   
-        print("e.returncode", e.returncode)
+        logging.error("e.returncode: " + e.returncode)
 
     thumb_file = pdfFile.replace('.pdf', '-thumb-medium.png')
     cmd = 'convert -quiet -density 200 -thumbnail x300 -flatten ' + pdfFile+'[0] ' + thumb_file
     try:
         subprocess.check_call(cmd, shell=True)
     except subprocess.CalledProcessError as e:   
-        print("e.returncode", e.returncode)
+        logging.error("e.returncode: " + e.returncode)
 
     thumb_file = pdfFile.replace('.pdf', '-thumb-large.png')
     cmd = 'convert -quiet -density 200 -thumbnail x500 -flatten ' + pdfFile+'[0] ' + thumb_file
     try:
         subprocess.check_call(cmd, shell=True)
     except subprocess.CalledProcessError as e:   
-        print("e.returncode", e.returncode)
+        logging.error("e.returncode: " + e.returncode)
 
 def generateStoragePath(identifier):
     '''

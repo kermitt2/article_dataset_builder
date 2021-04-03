@@ -154,7 +154,7 @@ def _load_config(config_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description = "COVIDataset harvester")
-    parser.add_argument("--documents", help="path to the CORD-19 uncompressed document dataset") 
+    parser.add_argument("--documents", help="path to the official CORD-19 uncompressed document dataset") 
     parser.add_argument("--metadata", help="path to the CORD-19 CSV metadata file") 
     parser.add_argument("--config", default="./config.json", help="path to the config file, default is ./config.json") 
     args = parser.parse_args()

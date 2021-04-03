@@ -14,7 +14,7 @@ The harvesting is following fair-use (which means that it covers non re-sharable
 To do:
 - list of ISTEX identifiers or ark, one DOI per line
 - Apache Airflow for the task workflow
-- consolidate/resolve bibliographical references obtained via Pub2TEI
+- Consolidate/resolve bibliographical references obtained via Pub2TEI
 
 ## What:
 
@@ -67,7 +67,7 @@ It should be possible to use the public demo instance of [biblio-glutton](https:
 
 As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and [Unpaywall API](https://unpaywall.org/products/api) services are used to cover the gap. For these two services, you need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. 
 
-An important parameter in the `config.json` file is the number of parallel document processing that is allowed, this is specified by the attribute `batch_size`, default value being `10` (so 10 documents max downloaded in parallel with distinct threads/workers and processed by Grobid in parallel). You can set this number according to your available number of threads.   
+An important parameter in the `config.json` file is the number of parallel document processing that is allowed, this is specified by the attribute `batch_size`, default value being `10` (so 10 documents max downloaded in parallel with distinct threads/workers and processed by Grobid in parallel). You can set this number according to your available number of threads. Be careful that parallel download from the same source might be blocked or might result in black-listing for some OA publisher sites, so it might be better to keep `batch_size` low.  
 
 These tools requires Java 8 or more. 
 
@@ -142,7 +142,7 @@ file) or on a S3 bucket if the fields are filled in config.json.
 You can set a specific config file name with `--config` :
 
 ```console
-python3 harvest --cord19 metadata.csv --config my_config_file.json    
+python3 harvest.py --cord19 metadata.csv --config my_config.json    
 ```
 
 To resume an interrupted processing, simply re-run the same command. 
@@ -150,19 +150,19 @@ To resume an interrupted processing, simply re-run the same command.
 To re-process the failed articles of an harvesting, use:
 
 ```console
-python3 harvest.py --reprocess 
+python3 harvest.py --reprocess --config my_config.json  
 ```
 
 To reset entirely an existing harvesting and re-start an harvesting from zero:
 
 ```console
-python3 harvest.py --cord19 metadata.csv --reset
+python3 harvest.py --cord19 metadata.csv --reset --config my_config.json  
 ```
 
 To create a dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing), add the parameter `--dump`:
 
 ```console
-python3 harvest.py --dump 
+python3 harvest.py --dump --config my_config.json  
 ```
 
 The generated metadata file is named `consolidated_metadata.json`.
@@ -170,19 +170,19 @@ The generated metadata file is named `consolidated_metadata.json`.
 For producing the thumbnail images of the article first page, use `--thumbnail` argument. This option requires `imagemagick` installed on your system and will produce 3 PNG files of size height x150, x300 and x500. These thumbnails can be interesting for offering a preview to an article for an application using these data.
 
 ```console
-python3 harvest.py --cord19 metadata.csv --thumbnail 
+python3 harvest.py --cord19 metadata.csv --thumbnail --config my_config.json  
 ```
 
 For producing PDF annotations in JSON format corresponding to the bibliographical information (reference markers in the article and bibliographical references in the bibliographical section), use the argument `--annotation`. See more information about these annotations [here](https://grobid.readthedocs.io/en/latest/Coordinates-in-PDF/). They allow to enrich the display of PDF, and make them more interactive. 
 
 ```console
-python3 harvest.py --cord19 metadata.csv --annotation 
+python3 harvest.py --cord19 metadata.csv --annotation --config my_config.json  
 ```
 
 Finally you can run a short diagnostic/reporting on the latest harvesting like this:
 
 ```console
-python3 harvest.py --diagnostic 
+python3 harvest.py --diagnostic --config my_config.json  
 ```
 
 ## Generated files
@@ -213,6 +213,19 @@ The `*.nxml` files correspond to the JATS files available for PMC (Open Access s
 
 # CORD-19
 
+The tool can realize its own harvesting and ingestion of CORD-19 papers based on an official version of the `metadata.csv` file of CORD-19. It provides two main advantages as compared to the official CORD-19 dataset:
+
+- Harvest around 35% more usable full texts
+- Structure the full texts into high quality TEI format (both from PDF and from JATS), with much more information than the JSON format of the CORD-19 dataset. The JATS conversion into TEI in particular does not lose any information from the original XML file.
+
+Be sure to install the latest available version of GROBID, many recent improvements have been added to the tool in the last months regarding the support of bioRxiv and medRxiv preprints.
+
+To launch the harvesting (see above for more details):
+
+```console
+python3 harvest.py --cord19 metadata.csv  
+```
+
 For the CORD-19 dataset, for simplification and clarity, we reuse the `cord id` which is a random string 8 characters in `[0-9a-z]`: 
 
 ```
@@ -232,11 +245,19 @@ Optional additional files:
 00/0a/je/vz/000ajevz/000ajevz-thumb-large.png
 ```
 
+For harvesting and structuring, you only need the metadata file of the CORD-19 dataset, available at: 
+
+  https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/<date_iso_str>/metadata.csv
+
+where `<date_iso_str>` should match a release date indicated on the [CORD-19 release page](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/historical_releases.html).
+
+For running the coverage script, which compares the full text coverage of the official CORD-19 dataset with the one produced by the present tool, you will need the full CORD-19 dataset. 
+
 ## On harvesting and ingesting the CORD-19 dataset
 
-### Using a local PDF repository for CORD-19
+### Adding a local PDF repository for Elsevier OA COVID papers
 
-The [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research) includes more than 19k articles corresponding to a set of Elsevier articles on COVID-19 [recently put in Open Access](https://www.elsevier.com/connect/coronavirus-information-center). As Unpaywall does not cover these OA articles (on 23.03.2020 at least), you would need to download first these PDF and indicates to the harvesting tool where the local repository of PDF is located: 
+The [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research) includes more than 19k articles corresponding to a set of Elsevier articles on COVID-19 [recently put in Open Access](https://www.elsevier.com/connect/coronavirus-information-center). As Unpaywall does not cover these OA articles (on 23.03.2020 at least), you will need to download first these PDF and indicates to the harvesting tool where the local repository of PDF is located: 
 
 - download the PDF files on the COVID-19 FTP server: 
 
@@ -258,6 +279,24 @@ mget *
 ```
 
 That's it. The file `./elsevier_covid_map_28_06_2020.csv.gz` contains a map of DOI and PII (the Elsevier article identifiers) for these OA articles. 
+
+### Incremental harvesting
+
+CORD-19 is updated regularly. Suppose that you have harvested one release of the CORD-19 full texts and a few weeks later you would like to refresh your local corpus. Incremental harvesting is supported, so only the new entries will be uploaded and ingested. 
+
+If the harvesting was done with one version of the metadata file `metadata-2020-09-11.csv` (from the `2020-09-11` release):
+
+```console
+python3 harvest.py --cord19 metadata-2020-09-11.csv --config my_config.json   
+```
+
+The incremental update will be realized with a new version of the metadata file simply by specifying it:
+
+```console
+python3 harvest.py --cord19 metadata-2021-03-22.csv --config my_config.json  
+```
+
+The constraint is that the same data repository path is kept in the config file. The repository and its state will be reused to check if an entry has already been harvested or not.
 
 ### Results with CORD-19
 
@@ -292,7 +331,7 @@ Other main differences include:
 
 ## Converting the PMC XML JATS files into XML TEI
 
-After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is normally no loss of information from the JATS file.  
+After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is no loss of information from the JATS file.  
 
 To launch the conversion:
 
@@ -329,7 +368,7 @@ COVIDataset harvester
 optional arguments:
   -h, --help            show this help message and exit
   --documents DOCUMENTS
-                        path to the CORD-19 uncompressed document dataset
+                        path to the official CORD-19 uncompressed document dataset
   --metadata METADATA   path to the CORD-19 CSV metadata file
 ```
 
@@ -337,7 +376,7 @@ optional arguments:
 For example:
 
 ```
-python3 check_cord19_coverage.py --metadata metadata.csv --documents cord-19/2020-09-11/documents/
+python3 check_cord19_coverage.py --metadata metadata.csv --documents cord-19/2020-09-11/documents/ --config my_config.json
 ```
 
 
