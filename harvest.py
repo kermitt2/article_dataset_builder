@@ -293,7 +293,7 @@ class Harverster(object):
             # https://api.crossref.org/works/10.1037/0003-066X.59.1.29
             user_agent = {'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0 (mailto:' 
                 + self.config['crossref_email'] + ')'} 
-            response = requests.get(self.config['crossref_base']+"/works/"+doi, headers=user_agent)
+            response = requests.get(self.config['crossref_base']+"/works/"+doi, headers=user_agent, verify=False, timeout=5)
             if response.status_code == 200:
                 jsonResult = response.json()['message']
                 # filter out references and re-set doi, in case there are obtained via crossref
