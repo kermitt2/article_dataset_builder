@@ -190,7 +190,8 @@ class Harverster(object):
         We need to use the Unpaywall API to get fresh information, because biblio-glutton is based on the 
         Unpaywall dataset dump which has a 7-months gap.
         """
-        response = requests.get(self.config["unpaywall_base"] + doi, params={'email': self.config["unpaywall_email"]}).json()
+        response = requests.get(self.config["unpaywall_base"] + doi, 
+            params={'email': self.config["unpaywall_email"]}, verify=False, timeout=10).json()
         if response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
             return response['best_oa_location']['url_for_pdf']
         elif response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
@@ -1261,7 +1262,7 @@ def _download_requests(url, filename):
     HEADERS = {"""User-Agent""": """Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0"""}
     result = "fail" 
     try:
-        file_data = requests.get(url, allow_redirects=True, headers=HEADERS)
+        file_data = requests.get(url, allow_redirects=True, headers=HEADERS, verify=False, timeout=60)
         if file_data.status_code == 200:
             with open(filename, 'wb') as f_out:
                 f_out.write(file_data.content)
