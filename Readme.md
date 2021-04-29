@@ -306,7 +306,7 @@ Here are the results regarding the CORD-19 from __2020-09-11__ ([cord-19_2020-09
 |---|---|---|
 | total entries | 253,454 | 253,454 | 
 | without `cord id` duplicates | 241,335 | 241,335 |
-| without all duplicates | - | 161,839 |
+| without duplicates | - | 161,839 |
 | entries with valid OA URL | - | 141,142 |
 | entries with successfully downloaded PDF | - | 139,565 | 
 | entries with structured full texts via GROBID | 94,541 (PDF JSON) | 138,440 (TEI XML) |

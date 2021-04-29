@@ -266,25 +266,25 @@ class Harverster(object):
         jsonResult = None
 
         if doi is not None and len(doi)>0:
-            response = requests.get(biblio_glutton_url, params={'doi': doi})
+            response = requests.get(biblio_glutton_url, params={'doi': doi}, verify=False, timeout=5)
             success = (response.status_code == 200)
             if success:
                 jsonResult = response.json()
 
         if not success and pmid is not None and len(pmid)>0:
-            response = requests.get(biblio_glutton_url + "pmid=" + pmid)
+            response = requests.get(biblio_glutton_url + "pmid=" + pmid, verify=False, timeout=5)
             success = (response.status_code == 200)
             if success:
                 jsonResult = response.json()     
 
         if not success and pmcid is not None and len(pmcid)>0:
-            response = requests.get(biblio_glutton_url + "pmc=" + pmcid)  
+            response = requests.get(biblio_glutton_url + "pmc=" + pmcid, verify=False, timeout=5)  
             success = (response.status_code == 200)
             if success:
                 jsonResult = response.json()
 
         if not success and istex_id is not None and len(istex_id)>0:
-            response = requests.get(biblio_glutton_url + "istexid=" + istex_id)
+            response = requests.get(biblio_glutton_url + "istexid=" + istex_id, verify=False, timeout=5)
             success = (response.status_code == 200)
             if success:
                 jsonResult = response.json()
