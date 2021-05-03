@@ -333,14 +333,14 @@ Other main differences include:
 
 After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is no loss of information from the JATS file.  
 
-To launch the conversion:
+To launch the conversion under the default `data/` directory:
 
 
 ```console
 python3 nlm2tei.py
 ```
 
-If a custom config file is used:
+If a custom config file and custom `data/` path are used:
 
 ```console
 python3 nlm2tei.py --config ./my_config.json
@@ -376,7 +376,7 @@ optional arguments:
 For example:
 
 ```
-python3 check_cord19_coverage.py --metadata metadata.csv --documents cord-19/2020-09-11/documents/ --config my_config.json
+python3 check_cord19_coverage.py --metadata cord-19/2021-03-22/metadata.csv --documents cord-19/2021-03-22/document_parses/ --config my_config.json
 ```
 
 

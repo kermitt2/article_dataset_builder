@@ -22,6 +22,7 @@ def check_coverage(config_path, metadata, documents):
     # WHO #Covidence,has_full_text,full_text_file,url
     line_count = 0 # total count of articles
     at_least_one = 0 # total of entries with at least one json
+    at_least_one_tei = 0 # total of entries with at least one TEI in our harvesting
     json_pdf = 0 # total of entries with a PDF-derived json
     json_pmc = 0 # total of entries with a PMC-NLM-derived json
     harvested = 0 # total of entries with PDF-derived or PMC-NLM-derived json which has been harvested
@@ -93,6 +94,7 @@ def check_coverage(config_path, metadata, documents):
                     local_doc_path_grobid = os.path.join(data_path, dest_path, cord_id+".grobid.tei.xml")
                     local_doc_path_pub2tei = os.path.join(data_path, dest_path, cord_id+".pub2tei.tei.xml")
                     if (os.path.exists(local_doc_path_grobid) and os.path.isfile(local_doc_path_grobid)) or (os.path.exists(local_doc_path_pub2tei) and os.path.isfile(local_doc_path_pub2tei)):
+                        at_least_one_tei += 1
                         if json_present:
                             harvested += 1
                         else:
@@ -128,11 +130,11 @@ def check_coverage(config_path, metadata, documents):
     pbar.close()
 
     print("\nprocessed", str(line_count), "article entries from CORD-19 metadata file")
-    print("total distinct cord id:", str(len(cord_ids)), "("+str(line_count - len(cord_ids)),"duplicated cord ids)")
+    print("total distinct cord id with JSON full text:", str(len(cord_ids)), "("+str(line_count - len(cord_ids)),"duplicated cord ids)")
 
-    print("total PMC-derived JSON:", json_pmc)
-    print("total PDF-derived JSON:", json_pdf)
-    print("total entry with at least one JSON:", at_least_one)
+    print("total CORD-19 official PMC-derived JSON:", json_pmc)
+    print("total CORD-19 official PDF-derived JSON:", json_pdf)
+    print("total entry with at least one JSON (official CORD-19):", at_least_one)
 
     print("\ntotal CORD-19 JSON we harvested too:", harvested)
     print("\tvia Unpaywall PDF and GROBID:", harvested_grobid)
@@ -143,6 +145,8 @@ def check_coverage(config_path, metadata, documents):
     print("\tvia Unpaywall PDF and GROBID:", extra_harvested_grobid)
     print("\tvia PMC/NLM and Pub2TEI:", extra_harvested_pmc)
     print("\t -> see file", path_extra,"for the list of extra entries")
+
+    print("\ntotal distinct cord id with TEI XML full text (our harvesting):", at_least_one_tei)
 
 def _load_config(config_path):
     """

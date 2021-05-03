@@ -779,6 +779,7 @@ class Harverster(object):
         # call Unpaywall
         localUrl = None
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
+
             # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
             if "pmcid" in localJson:
                 localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
@@ -823,18 +824,29 @@ class Harverster(object):
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
         if not localJson["has_valid_pdf"]:
             if "oaLink" in localJson:
-                localUrl = localJson["oaLink"]
-                if localUrl is not None and len(localUrl)>0:
-                    if localUrl.startswith("file://") and os.path.isfile(localUrl.replace("file://","")):
-                        shutil.copyfile(localUrl.replace("file://",""), pdf_filename)
-                    elif localUrl.endswith(".tar.gz"):
-                        archive_file = os.path.join(self.config["data_path"], identifier+".tar.gz")
-                        _download(localUrl, archive_file)
-                        _manage_pmc_archives(archive_file)
-                    else:
-                        _download(localUrl, pdf_filename)
-                    if _is_valid_file(pdf_filename, "pdf"):
+                # if there is an archive directory/repo defined in the config, we can do a quick look-up there if local a PDF
+                # is already available with the same identifier
+                if "archive_path" in self.config:
+                    dest_path = generateStoragePath(identifier)
+                    old_pdf_filename = os.path.join(self.config["archive_path"], dest_path, identifier+".pdf")
+                    if os.path.exists(old_pdf_filename) and _is_valid_file(old_pdf_filename, "pdf"):
+                        # an existing pdf has been archive fot this unique identifier, let's reuse it
+                        shutil.copy(old_pdf_filename, pdf_filename)
                         localJson["has_valid_pdf"] = True
+
+                if not localJson["has_valid_pdf"]:
+                    localUrl = localJson["oaLink"]
+                    if localUrl is not None and len(localUrl)>0:
+                        if localUrl.startswith("file://") and os.path.isfile(localUrl.replace("file://","")):
+                            shutil.copyfile(localUrl.replace("file://",""), pdf_filename)
+                        elif localUrl.endswith(".tar.gz"):
+                            archive_file = os.path.join(self.config["data_path"], identifier+".tar.gz")
+                            _download(localUrl, archive_file)
+                            _manage_pmc_archives(archive_file)
+                        else:
+                            _download(localUrl, pdf_filename)
+                        if _is_valid_file(pdf_filename, "pdf"):
+                            localJson["has_valid_pdf"] = True
 
         # GROBIDification if PDF available and we don't limit ourself to just download
         if not localJson["has_valid_tei"] and not self.only_download:
