@@ -376,7 +376,7 @@ optional arguments:
 For example:
 
 ```
-python3 check_cord19_coverage.py --metadata cord-19/2021-03-22/metadata.csv --documents cord-19/2021-03-22/document_parses/ --config my_config.json
+python3 check_cord19_coverage.py --metadata cord-19/2021-03-22/metadata.csv --documents cord-19/2021-03-22/ --config my_config.json
 ```
 
 
