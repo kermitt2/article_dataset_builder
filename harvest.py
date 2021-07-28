@@ -109,8 +109,8 @@ class Harverster(object):
         if self.config["cord19_elsevier_pdf_path"] is not None and len(self.config["cord19_elsevier_pdf_path"])>0 and self.elsevier_oa_map is None:
             # init map
             self.elsevier_oa_map = {}
-            if os.path.isfile(os.path.join(self.resource_path, "elsevier_covid_map_20_09_2020.csv.gz")):
-                with gzip.open(os.path.join(self.resource_path, "elsevier_covid_map_20_09_2020.csv.gz"), mode="rt") as csv_file:
+            if os.path.isfile(os.path.join(self.resource_path, self.config["cord19_elsevier_map_path"])):
+                with gzip.open(os.path.join(self.resource_path, self.config["cord19_elsevier_map_path"]), mode="rt") as csv_file:
                     csv_reader = csv.DictReader(csv_file)
                     for row in csv_reader:
                         if row["doi"] is not None and len(row["doi"])>0:
@@ -139,8 +139,8 @@ class Harverster(object):
         # files (PDF not always present)
         resource_file = os.path.join(self.resource_path, "oa_file_list.txt")
         # TBD: if the file is not present we should download it at ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
+        # https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
         if not os.path.isfile(resource_file):
-            # TBD: if the file is not present we should download it at ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
             url = "ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt"
             logging.debug("Downloading PMC resource file: " + url)
             _download(url, resource_file)
@@ -824,15 +824,22 @@ class Harverster(object):
         pdf_filename = os.path.join(self.config["data_path"], identifier+".pdf")
         if not localJson["has_valid_pdf"]:
             if "oaLink" in localJson:
-                # if there is an archive directory/repo defined in the config, we can do a quick look-up there if local a PDF
-                # is already available with the same identifier
-                if "archive_path" in self.config:
+                # if there is an legacy directory/repo defined in the config, we can do a quick look-up there if local a PDF
+                # is already available/downloaded with the same identifier
+                if "legacy_data_path" in self.config:
                     dest_path = generateStoragePath(identifier)
-                    old_pdf_filename = os.path.join(self.config["archive_path"], dest_path, identifier+".pdf")
+                    old_pdf_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".pdf")
                     if os.path.exists(old_pdf_filename) and _is_valid_file(old_pdf_filename, "pdf"):
                         # an existing pdf has been archive fot this unique identifier, let's reuse it
                         shutil.copy(old_pdf_filename, pdf_filename)
                         localJson["has_valid_pdf"] = True
+
+                    # check if we have also a nlm file already downloaded
+                    old_nlm_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".nxml")
+                    if os.path.exists(old_nlm_filename) and _is_valid_file(old_nlm_filename, "xml"):
+                        # an existing pdf has been archive fot this unique identifier, let's reuse it
+                        nlm_filename = os.path.join(self.config["data_path"], identifier+".nlm")
+                        shutil.copy(old_nlm_filename, nlm_filename)
 
                 if not localJson["has_valid_pdf"]:
                     localUrl = localJson["oaLink"]

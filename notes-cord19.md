@@ -1,3 +1,5 @@
+
+
 ## CORD-19 version 2020-09-11 
 
 CORD-19 metadata.json file can have multiple rows with the same cord identifier see the FAQ:

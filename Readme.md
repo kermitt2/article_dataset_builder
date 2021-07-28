@@ -16,7 +16,7 @@ To do:
 - Apache Airflow for the task workflow
 - Consolidate/resolve bibliographical references obtained via Pub2TEI
 
-## What:
+## What
 
 - Perform some metadata enrichment/agregation via [biblio-glutton](https://github.com/kermitt2/biblio-glutton) & [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and output consolidated metadata in a json file 
 
@@ -70,6 +70,15 @@ As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset
 An important parameter in the `config.json` file is the number of parallel document processing that is allowed, this is specified by the attribute `batch_size`, default value being `10` (so 10 documents max downloaded in parallel with distinct threads/workers and processed by Grobid in parallel). You can set this number according to your available number of threads. Be careful that parallel download from the same source might be blocked or might result in black-listing for some OA publisher sites, so it might be better to keep `batch_size` low.  
 
 These tools requires Java 8 or more. 
+
+For downloading preferably the fulltexts available at PubMed Central from the NIH site rather than on publisher sites, you need to download the Open Access list file from PMC that maps PMC identifiers to PMC resource archive URL:
+
+```console
+cd resources
+wget https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
+```
+
+If this file is available under `resources/oa_file_list.txt`, an index will be built at first launch and the harvester will prioritize the access to the NIH resources. 
 
 ## Docker
 
@@ -297,6 +306,8 @@ python3 harvest.py --cord19 metadata-2021-03-22.csv --config my_config.json
 ```
 
 The constraint is that the same data repository path is kept in the config file. The repository and its state will be reused to check if an entry has already been harvested or not.
+
+As an alternative, it is also possible to point to a local old data directory in the config file, with parameter `legacy_data_path`. Before trying to download a file from the internet, the harvester will first check in this older data directory if the PDF files are not already locally available based on the same identifiers. 
 
 ### Results with CORD-19
 
