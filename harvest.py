@@ -59,14 +59,13 @@ class Harverster(object):
 
         # boolean indicating if we want to generate thumbnails of front page of PDF 
         self.thumbnail = thumbnail
-
         self.annotation = annotation
 
         # if a sample value is provided, indicate that we only harvest the indicated number of PDF
         self.sample = sample
 
         self.s3 = None
-        if self.config["bucket_name"] is not None and len(self.config["bucket_name"]) is not 0:
+        if self.config["bucket_name"] is not None and len(self.config["bucket_name"]) > 0:
             self.s3 = S3.S3(self.config)
 
         # in case we use a local folder filled with Elsevier COVID-19 Open Access PDF from their ftp server
@@ -709,7 +708,16 @@ class Harverster(object):
             value = txn.get(identifier.encode(encoding='UTF-8'))
             if value is not None:
                 localJson = _deserialize_pickle(value)
-                    
+        
+        # check if the json is already in the legacy repo
+        '''
+        if "legacy_data_path" in self.config and len(self.config["legacy_data_path"].strip())>0:
+            dest_path = generateStoragePath(identifier)
+            old_json_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".json")
+            if os.path.exists(old_json_filename) and _is_valid_file(old_pdf_filename, "json"):
+                localJson = json.load(old_json_filename)
+        '''
+
         if localJson is None:
             try:    
                 localJson = self.biblio_glutton_lookup(doi=_clean_doi(row["doi"]), pmcid=row["pmcid"], pmid=row["pubmed_id"], istex_id=None, istex_ark=None)
@@ -781,10 +789,12 @@ class Harverster(object):
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
 
             # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
+            '''
             if "pmcid" in localJson:
                 localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
                 if localUrl is None:
                     logging.debug("no PMC oa valid url: " + localJson["pmcid"])
+            '''
 
             if localUrl is None:
                 # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
@@ -801,12 +811,25 @@ class Harverster(object):
                 if local_elsevier is not None and os.path.isfile(local_elsevier):
                     localUrl = "file://" + local_elsevier
 
+            # check if the PDF and metadata are available in the legacy repo
+            if "legacy_data_path" in self.config and len(self.config["legacy_data_path"].strip())>0:
+                dest_path = generateStoragePath(identifier)
+                old_pdf_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".pdf")
+                if os.path.exists(old_pdf_filename) and _is_valid_file(old_pdf_filename, "pdf"):
+                    localUrl = "file://" + old_pdf_filename
+
             if localUrl is None:
                 try:
                     localUrl = self.unpaywalling_doi(localJson['DOI'])
                 except:
                     logging.debug("Unpaywall API call for finding Open URL not succesful")   
                     
+            if localUrl is None:
+                if "pmcid" in localJson:
+                    localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
+                    if localUrl is None:
+                        logging.debug("no PMC oa valid url: " + localJson["pmcid"])
+
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
                     # we can try to use the OA link from bibilio-glutton as fallback (though not very optimistic on this!)
@@ -826,7 +849,7 @@ class Harverster(object):
             if "oaLink" in localJson:
                 # if there is an legacy directory/repo defined in the config, we can do a quick look-up there if local a PDF
                 # is already available/downloaded with the same identifier
-                if "legacy_data_path" in self.config:
+                if "legacy_data_path" in self.config and len(self.config["legacy_data_path"].strip())>0:
                     dest_path = generateStoragePath(identifier)
                     old_pdf_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".pdf")
                     if os.path.exists(old_pdf_filename) and _is_valid_file(old_pdf_filename, "pdf"):
@@ -1229,7 +1252,7 @@ def _download_wget(url, filename):
     result = "fail"
     # This is the most robust and reliable way to download files I found with Python... to rely on system wget :)
     #cmd = "wget -c --quiet" + " -O " + filename + ' --connect-timeout=10 --waitretry=10 ' + \
-    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=5 --waitretry=0 --tries=10 --retry-connrefused ' + \
+    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=10 --waitretry=0 --tries=10 --retry-connrefused ' + \
         '--header="User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0" ' + \
         '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
         '--no-check-certificate ' + \
@@ -1269,7 +1292,7 @@ def _download_wget(url, filename):
         result = "fail"
 
     except Exception as e:
-        logging.error("Unexpected error wget process" + str(e))
+        logging.error("Unexpected error wget process: " + str(e))
         result = "fail"
 
     return str(result)
@@ -1281,7 +1304,7 @@ def _download_requests(url, filename):
     HEADERS = {"""User-Agent""": """Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0"""}
     result = "fail" 
     try:
-        file_data = requests.get(url, allow_redirects=True, headers=HEADERS, verify=False, timeout=60)
+        file_data = requests.get(url, allow_redirects=True, headers=HEADERS, verify=False, timeout=10)
         if file_data.status_code == 200:
             with open(filename, 'wb') as f_out:
                 f_out.write(file_data.content)
