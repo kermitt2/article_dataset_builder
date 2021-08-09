@@ -462,7 +462,7 @@ class Harverster(object):
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                         # branch to the right entry processor, depending on the input csv 
-                        executor.map(self.processEntryDOI, identifiers, dois)
+                        executor.map(self.processEntryDOI, identifiers, dois, timeout=50)
                     # reinit
                     i = 0
                     identifiers = []
@@ -486,7 +486,7 @@ class Harverster(object):
             if len(identifiers) > 0:
                 with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                     # branch to the right entry processor, depending on the input csv 
-                    executor.map(self.processEntryDOI, identifiers, dois)
+                    executor.map(self.processEntryDOI, identifiers, dois, timeout=50)
 
             print("processed", str(line_count), "articles")
 
@@ -513,7 +513,7 @@ class Harverster(object):
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                         # branch to the right entry processor, depending on the input csv 
-                        executor.map(self.processEntryCord19, identifiers, rows)
+                        executor.map(self.processEntryCord19, identifiers, rows, timeout=50)
                     # reinit
                     i = 0
                     identifiers = []
@@ -545,7 +545,7 @@ class Harverster(object):
             if len(identifiers) >0:
                 with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                     # branch to the right entry processor, depending on the input csv 
-                    executor.map(self.processEntryCord19, identifiers, rows)
+                    executor.map(self.processEntryCord19, identifiers, rows, timeout=50)
 
             print("processed", str(line_count), "articles from CORD-19")
 
@@ -561,7 +561,7 @@ class Harverster(object):
 
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                        executor.map(self.processEntryPMID, identifiers, pmids)
+                        executor.map(self.processEntryPMID, identifiers, pmids, timeout=50)
                     # reinit
                     i = 0
                     identifiers = []
@@ -583,7 +583,7 @@ class Harverster(object):
             # we need to process the last incomplete batch, if not empty
             if len(identifiers) > 0:
                 with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                    executor.map(self.processEntryPMID, identifiers, pmids)
+                    executor.map(self.processEntryPMID, identifiers, pmids, timeout=50)
 
             print("processed", str(line_count), "article PMID")
 
@@ -599,7 +599,7 @@ class Harverster(object):
 
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                        executor.map(self.processEntryPMCID, identifiers, pmcids)
+                        executor.map(self.processEntryPMCID, identifiers, pmcids, timeout=50)
                     # reinit
                     i = 0
                     identifiers = []
@@ -625,7 +625,7 @@ class Harverster(object):
             # we need to process the last incomplete batch, if not empty
             if len(identifiers) > 0:
                 with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                    executor.map(self.processEntryPMCID, identifiers, pmcids)
+                    executor.map(self.processEntryPMCID, identifiers, pmcids, timeout=50)
 
             print("processed", str(line_count), "article PMC ID")
 
@@ -1118,7 +1118,7 @@ class Harverster(object):
             for key, value in cursor:
                 if i == self.config["batch_size"]:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                        executor.map(self.processTask, localJsons)
+                        executor.map(self.processTask, localJsons, timeout=50)
                     # reinit
                     i = 0
                     localJsons = []
@@ -1140,7 +1140,7 @@ class Harverster(object):
         # we need to process the latest incomplete batch (if not empty)
         if len(localJsons)>0:
             with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                executor.map(self.processTask, localJsons)
+                executor.map(self.processTask, localJsons, timeout=50)
 
 
 def _serialize_pickle(a):
@@ -1252,8 +1252,8 @@ def _download_wget(url, filename):
     result = "fail"
     # This is the most robust and reliable way to download files I found with Python... to rely on system wget :)
     #cmd = "wget -c --quiet" + " -O " + filename + ' --connect-timeout=10 --waitretry=10 ' + \
-    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=10 --waitretry=0 --tries=10 --retry-connrefused ' + \
-        '--header="User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0" ' + \
+    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=10 --waitretry=0 --tries=5 --retry-connrefused ' + \
+        '--header="User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0" ' + \
         '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
         '--no-check-certificate ' + \
         '"' + url + '"'
