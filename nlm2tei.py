@@ -57,7 +57,8 @@ class Nlm2tei(object):
         # walk through the data directory, copy .nxml files to the temp directory
         for root, dirs, files in os.walk(self.config["data_path"]):
             for the_file in files:
-                if the_file.endswith(".nxml"):
+                # normally all NLM/JATS files are stored with extension .nxml, but for safety we also cover .nlm extension
+                if the_file.endswith(".nxml") or the_file.endswith(".nlm"):
                     #print(root, the_file)
                     if not os.path.isfile(os.path.join(temp_dir,the_file)):
                         shutil.copy(os.path.join(root,the_file), temp_dir)
@@ -115,7 +116,7 @@ class Nlm2tei(object):
             return
 
         for f in os.listdir(temp_dir_out):
-            if f.endswith(".nxml.xml") or f.endswith(".nxml"):
+            if f.endswith(".nxml.xml") or f.endswith(".nxml") or f.endswith(".nlm"):
                 # move the file back to its storage location (which can be S3)
                 identifier = f.split(".")[0]
                 if self.s3 is not None:

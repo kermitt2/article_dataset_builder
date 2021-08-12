@@ -859,9 +859,9 @@ class Harverster(object):
 
                     # check if we have also a nlm file already downloaded
                     old_nlm_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".nxml")
-                    if os.path.exists(old_nlm_filename) and _is_valid_file(old_nlm_filename, "xml"):
+                    if os.path.exists(old_nlm_filename): #and _is_valid_file(old_nlm_filename, "xml"):
                         # an existing pdf has been archive fot this unique identifier, let's reuse it
-                        nlm_filename = os.path.join(self.config["data_path"], identifier+".nlm")
+                        nlm_filename = os.path.join(self.config["data_path"], identifier+".nxml")
                         shutil.copy(old_nlm_filename, nlm_filename)
 
                 if not localJson["has_valid_pdf"]:
