@@ -1058,7 +1058,7 @@ class Harverster(object):
         print("total entries with successfully downloaded PDF:", str(nb_total-nb_invalid_pdf))
         print("---")
         print("total invalid TEI:", nb_invalid_tei)
-        print("total entries with successfully convereted TEI XML:", str(nb_total-nb_invalid_tei))
+        print("total entries with successfully converted TEI XML:", str(nb_total-nb_invalid_tei))
         print("---")
 
         if full:

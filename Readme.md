@@ -383,12 +383,13 @@ optional arguments:
   --metadata METADATA   path to the CORD-19 CSV metadata file
 ```
 
-
 For example:
 
 ```
 python3 check_cord19_coverage.py --metadata cord-19/2021-03-22/metadata.csv --documents cord-19/2021-03-22/ --config my_config.json
 ```
+
+The path for `--documents` is the path where the folder `document_parses` is located. 
 
 
 ## Troubleshooting with imagemagick
