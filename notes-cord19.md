@@ -1,3 +1,29 @@
+## CORD-19 version 2021-07-26 
+
+
+```
+processed 718492 article entries from CORD-19 metadata file
+total distinct cord id with JSON entry: 640739 (77753 duplicated cord ids)
+total CORD-19 official PMC-derived JSON fulltext: 184289
+total CORD-19 official PDF-derived JSON fulltex: 212489
+total entry with at least one JSON fulltext (official CORD-19): 235673
+
+total CORD-19 JSON fulltext we harvested too: 217243
+        via Unpaywall PDF and GROBID: 217070
+        via PMC/NLM and Pub2TEI: 137335
+         -> we missed 18430 entries, see file /media/lopez/store/cord-19/data/missed_entries.csv for the list missed entries
+
+total extra fultext we harvested in addition: 79660
+        via Unpaywall PDF and GROBID: 79639
+        via PMC/NLM and Pub2TEI: 16907
+         -> see file /media/lopez/store/cord-19/data/extra_entries.csv for the list of extra entries
+
+total additional fulltexts we harvested: 61230
+
+total distinct cord id with TEI XML full text (our fulltext harvesting and conversion): 296903
+
+296819 PDF files
+```
 
 
 ## CORD-19 version 2020-09-11 
