@@ -55,6 +55,8 @@ brew install libmagic
 
 ## Installation
 
+### Third party services
+
 The following tools need to be installed and running, with access information specified in the configuration file (`config.json`):
 
 - [Grobid](https://github.com/kermitt2/grobid), for converting PDF into XML TEI
@@ -65,7 +67,7 @@ The following tools need to be installed and running, with access information sp
 
 It should be possible to use the public demo instance of [biblio-glutton](https://github.com/kermitt2/biblio-glutton), as default configured in the `config.json` file (the tool scale at more than 6000 queries per second). However for [Grobid](https://github.com/kermitt2/grobid), we strongly recommand to install a local instance, because the online public demo will not be able to scale and won't be reliable given that it is more or less always overloaded. 
 
-As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and [Unpaywall API](https://unpaywall.org/products/api) services are used to cover the gap. For these two services, you need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. 
+As [biblio-glutton](https://github.com/kermitt2/biblio-glutton) is using dataset dumps, there is a gap of several months in term of bibliographical data freshness. So, complementary, the [CrossRef web API](https://github.com/CrossRef/rest-api-doc) and [Unpaywall API](https://unpaywall.org/products/api) services are used to cover the gap. For these two services, you need to indicate your email in the config file (`config.json`) to follow the etiquette policy of these two services. If the configuration parameters for `biblio-glutton` are empty, only the CrossRef REST API will be used. 
 
 An important parameter in the `config.json` file is the number of parallel document processing that is allowed, this is specified by the attribute `batch_size`, default value being `10` (so 10 documents max downloaded in parallel with distinct threads/workers and processed by Grobid in parallel). You can set this number according to your available number of threads. Be careful that parallel download from the same source might be blocked or might result in black-listing for some OA publisher sites, so it might be better to keep `batch_size` low.  
 
@@ -79,6 +81,16 @@ wget https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
 ```
 
 If this file is available under `resources/oa_file_list.txt`, an index will be built at first launch and the harvester will prioritize the access to the NIH resources. 
+
+### Article dataset builder
+
+Create a virtual environment and install the python mess:
+
+```console
+virtualenv --system-site-packages -p python3 env
+source env/bin/activate
+pip3 install -r requirements.txt
+```
 
 ## Docker
 
@@ -119,11 +131,7 @@ optional arguments:
                    processing them
 ```
 
-Fill the file `config.json` with relevant service and parameter url, then install the python mess:
-
-```console
-pip3 install -r requirements.txt
-```
+Fill the file `config.json` with relevant service and parameter url.
 
 For instance to process a list of DOI (one DOI per line):
 
@@ -202,8 +210,11 @@ Structure of the generated files for an article having as UUID identifier `98da1
 
 ```
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.pdf
+98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.json
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5.grobid.tei.xml
 ```
+
+The `*.json` file above gives the metadata of the harvested item, based on CrossRef entries, with additional information provided by `biblio-glutton`, status of the harvesting and GROBID processing and UUID (field `id`). 
 
 Optional additional files:
 
@@ -216,7 +227,7 @@ Optional additional files:
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-large.png
 ```
 
-The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file.
+The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file (obtained with option `--dump`, see above).
 
 The `*.nxml` files correspond to the JATS files available for PMC (Open Access set only).
 
