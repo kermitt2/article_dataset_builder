@@ -2,6 +2,7 @@ import argparse
 import os
 import io
 import sys
+import urllib3
 from urllib import parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
@@ -26,6 +27,8 @@ import logging.handlers
 
 map_size = 100 * 1024 * 1024 * 1024 
 logging.basicConfig(filename='harvester.log', filemode='w', level=logging.DEBUG)
+
+urllib3.disable_warnings()
 
 class Harverster(object):
     """
@@ -108,6 +111,8 @@ class Harverster(object):
         if self.config["cord19_elsevier_pdf_path"] is not None and len(self.config["cord19_elsevier_pdf_path"])>0 and self.elsevier_oa_map is None:
             # init map
             self.elsevier_oa_map = {}
+            if not "cord19_elsevier_map_path" in self.config or len(self.config["cord19_elsevier_map_path"])==0:
+                return
             if os.path.isfile(os.path.join(self.resource_path, self.config["cord19_elsevier_map_path"])):
                 with gzip.open(os.path.join(self.resource_path, self.config["cord19_elsevier_map_path"]), mode="rt") as csv_file:
                     csv_reader = csv.DictReader(csv_file)
@@ -260,6 +265,9 @@ class Harverster(object):
         """
         Lookup on biblio_glutton with the provided strong identifiers, return the full agregated biblio_glutton record
         """
+        if not "biblio_glutton_base" in self.config or len(self.config["biblio_glutton_base"]) == 0:
+            return None
+
         biblio_glutton_url = _biblio_glutton_url(self.config["biblio_glutton_base"], self.config["biblio_glutton_port"])
         success = False
         jsonResult = None
@@ -363,7 +371,7 @@ class Harverster(object):
 
     def run_grobid(self, pdf_file, output=None, annotation_output=None):
         # normal fulltext TEI file
-        logging.debug("run grobid:", pdf_file, output)
+        logging.debug("run grobid:" + pdf_file + " -> " + output)
         if output is not None:
             files = {
                 'input': (
@@ -381,8 +389,10 @@ class Harverster(object):
             the_data = {}
             the_data['generateIDs'] = '1'
             the_data['consolidateHeader'] = '1'
-            the_data['consolidateCitations'] = '1'   
+            the_data['consolidateCitations'] = '0'   
             the_data['includeRawCitations'] = '1'
+            the_data['includeRawAffiliations'] = '1'
+            the_data['teiCoordinates'] = ['ref', 'biblStruct', 'persName', 'figure', 'formula', 's']
 
             r = requests.request(
                 "POST",
@@ -907,6 +917,10 @@ class Harverster(object):
                 generate_thumbnail(pdf_filename)
                 if _is_valid_file(pdf_filename.replace('.pdf', '-thumb-small.png'), "png"):
                     localJson["has_valid_thumbnail"] = True
+
+        # indicate where the produced resources are
+        dest_path = generateStoragePath(localJson['id'])
+        localJson["data_path"] = dest_path
 
         # write the consolidated metadata in the working data directory 
         with open(os.path.join(self.config["data_path"],identifier+".json"), "w") as file_out:

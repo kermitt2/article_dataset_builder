@@ -22,3 +22,4 @@ resources/*
 !resources/elsevier_covid_map_26_07_2021.csv.gz
 !resources/build_elsevier_map.py 
 arxiv_config.json
+env
