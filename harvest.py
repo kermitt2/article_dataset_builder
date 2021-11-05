@@ -268,7 +268,7 @@ class Harverster(object):
         if not "biblio_glutton_base" in self.config or len(self.config["biblio_glutton_base"]) == 0:
             return None
 
-        biblio_glutton_url = _biblio_glutton_url(self.config["biblio_glutton_base"], self.config["biblio_glutton_port"])
+        biblio_glutton_url = _biblio_glutton_url(self.config["biblio_glutton_base"])
         success = False
         jsonResult = None
 
@@ -1237,13 +1237,10 @@ def _initProcessStateInformation(json_entry):
         json_entry["has_valid_thumbnail"] = False
     return json_entry
 
-def _biblio_glutton_url(biblio_glutton_base, biblio_glutton_port):
-    if biblio_glutton_base.endswith("/"):
-        res = biblio_glutton_base[:-1]
-    else: 
-        res = biblio_glutton_base
-    if biblio_glutton_port is not None and len(biblio_glutton_port)>0:
-        res += ":"+biblio_glutton_port
+def _biblio_glutton_url(biblio_glutton_url):
+    res = biblio_glutton_url
+    if biblio_glutton_url.endswith("/"):
+        res = biblio_glutton_url[:-1]
     return res+"/service/lookup?"
 
 def _grobid_url(grobid_base, grobid_port):
