@@ -411,6 +411,21 @@ Recent update (end of October 2018) of imagemagick is breaking the normal conver
 <!-- <policy domain="coder" rights="none" pattern="PDF" /> -->
 ```
 
+## How to cite 
+
+For citing this software work, please refer to the present GitHub project, together with the [Software Heritage](https://www.softwareheritage.org/) project-level permanent identifier. For example, with BibTeX:
+
+```bibtex
+@misc{articledatasetbuilder,
+    title = {Article Dataset Builder},
+    howpublished = {\url{https://github.com/kermitt2/article-dataset-builder}},
+    publisher = {GitHub},
+    year = {2020--2021},
+    archivePrefix = {swh},
+    eprint = {1:dir:adc1581a092560c0ac4a82256c0c905859ec15fc}
+}
+```
+
 ## License and contact
 
 Distributed under [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0).
