@@ -198,7 +198,7 @@ class Harverster(object):
             params={'email': self.config["unpaywall_email"]}, verify=False, timeout=10).json()
         if response['best_oa_location'] and 'url_for_pdf' in response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
             return response['best_oa_location']['url_for_pdf']
-        elif 'url' response['best_oa_location'] in and response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
+        elif 'url' in response['best_oa_location'] and response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
             return response['best_oa_location']['url']+"/pdf/"
         
         # we have a look at the other "oa_locations", which might have a `url_for_pdf` ('best_oa_location' has not always a 
