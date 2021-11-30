@@ -640,7 +640,7 @@ class Harverster(object):
             print("processed", str(line_count), "article PMC ID")
 
     def processEntryDOI(self, identifier, doi):
-        localJson = None        
+        localJson = None
 
         # if the entry has already been processed (partially or completely), we reuse the entry 
         with self.env_entries.begin(write=False) as txn:
@@ -1034,7 +1034,7 @@ class Harverster(object):
         txn = self.env_uuid.begin()
         return txn.get(strong_identifier.encode(encoding='UTF-8'))
 
-    def diagnostic(self, full=False):
+    def diagnostic(self, full=False, metadata_csv_file=None, cord19=False):
         """
         Print a report on failures stored during the harvesting process
         """
@@ -1122,6 +1122,103 @@ class Harverster(object):
             print("total entries with Pub2TEI TEI file:", str(nb_pub2tei_tei_present))
             print("total entries with at least one TEI file:", str(nb_tei_present))
             print("---")
+
+            if metadata_csv_file != None and cord19:
+                # adding some statistics on the CORD-19 entries
+
+                # first get the number of entries to be able to display a progress bar
+                nb_lines = 0
+                with open(metadata_csv_file, mode='r') as csv_file:
+                    csv_reader = csv.DictReader(csv_file)
+                    for row in csv_reader:
+                        nb_lines += 1
+
+                collection = {}
+                collection["name"] = "CORD-19"
+                collection["description"] = "Collection of Open Access research publications on COVID-19"
+                collection["version"] = "version of the collection - to be edited"
+                collection["harvester"] = "article-dataset-builder"
+                collection["documents"] = {}
+                collection["documents"]["distribution_entries_per_year"] = {}
+                collection["documents"]["distribution_harvested_per_year"] = {}
+
+                print("generating collection description/statistics on CORD-19 entries...")
+                total_entries = 0
+                total_distinct_entries = 0
+                total_harvested_entries = 0
+                distribution_years = {}
+                distribution_years_harvested = {}
+
+                # not memory friendly, but it's okay with modern computer... otherwise we will use another temporary lmdb 
+                cord_ids = []
+
+                # format is: 
+                # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
+                # WHO #Covidence,has_full_text,full_text_file,url
+                pbar = tqdm(total = nb_lines)
+                nb_lines = 0                
+                with open(metadata_csv_file, mode='r') as csv_file:
+                    csv_reader = csv.DictReader(csv_file)
+                    line_count = 0 # total count of articles
+                    i = 0 # counter for article per batch
+                    identifiers = []
+                    rows = []
+                    for row in tqdm(csv_reader, total=total_entries):
+                        nb_lines += 1
+                        if nb_lines % 100 == 0:
+                            pbar.update(100)
+
+                        if row["cord_uid"] == None or len(row["cord_uid"]) == 0:
+                            continue
+
+                        # is it indexed?
+                        cord_id = row["cord_uid"]
+                        if cord_id in cord_ids:
+                            # this is a duplicate
+                            continue
+
+                        cord_ids.append(cord_id)
+
+                        total_distinct_entries += 1
+                        
+                        # check if we have a full text for the entry (nlm/tei or pdf)
+                        harvested = False
+                        resource_path = generateStoragePath(cord_id)
+                        if os.path.isfile(os.path.join(resource_path, cord_id+".pdf")) or \
+                            os.path.isfile(os.path.join(resource_path, cord_id+".nxml")) or \
+                            os.path.isfile(os.path.join(resource_path, cord_id+".grobid.tei.xml")):
+                            total_harvested_entries =+1
+                            harvested = True
+
+                        # publishing date has ISO 8601 style format: 2000-08-15 
+                        if row["publish_time"]:
+                            year = row["publish_time"].split("-")[0]
+
+                            if not year in distribution_years:
+                                distribution_years[year] = 1
+                            else:
+                                distribution_years[year] += 1
+
+                            if harvested:
+                                if not year in distribution_years_harvested:
+                                    distribution_years_harvested[year] = 1
+                                else:
+                                    distribution_years_harvested[year] += 1
+
+                print("Collection description and statistics generated in file: ./collection.json")
+                collection["documents"]["total_entries"] = total_entries
+                collection["documents"]["total_distinct_entries"] = total_distinct_entries
+                collection["documents"]["total_harvested_entries"] = total_harvested_entries
+
+                for year in distribution_years:
+                    collection["documents"]["distribution_entries_per_year"][year] = distribution_years[year]
+
+                for year in distribution_years_harvested:
+                    collection["documents"]["distribution_harvested_per_year"][year] = distribution_years_harvested[year]
+
+                with open('collection.json', 'w') as outfile:
+                    json.dump(collection, outfile, indent=4)
+
 
     def reprocessFailed(self):
         localJsons = []

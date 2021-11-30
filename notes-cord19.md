@@ -1,3 +1,21 @@
+## CORD-19 version 2021-11-15 
+
+
+
+
+Official changelog for this version: 
+
+```
+---SUMMARY---
+total metadata rows: 831244
+CORD UIDs (new: 8797, removed: 522)
+
+Full text:
+  PDF - 296417 json (new: 4239, removed: 85)
+  PMC - 228979 json (new: 3298)
+```
+
+
 ## CORD-19 version 2021-07-26 
 
 
@@ -25,6 +43,17 @@ total distinct cord id with TEI XML full text (our fulltext harvesting and conve
 296819 PDF files
 ```
 
+Official changelog for this version: 
+
+```
+---SUMMARY---
+total metadata rows: 718492
+CORD UIDs (new: 12137, removed: 2371)
+
+Full text:
+  PDF - 240618 json (new: 4484, removed: 203)
+  PMC - 184667 json (new: 4047)
+```
 
 ## CORD-19 version 2020-09-11 
 
@@ -96,7 +125,7 @@ total entries with at least one TEI file: 140322
 entries with at least one fulltext tei file -> 140322
 ```
 
-CORD-19 dataset covergae check (see `check_cord19_coeverage.py`):
+CORD-19 dataset coverage check (see `check_cord19_coverage.py`):
 
 ```
 253454 entries
