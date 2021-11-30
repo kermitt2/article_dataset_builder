@@ -196,18 +196,24 @@ class Harverster(object):
         """
         response = requests.get(self.config["unpaywall_base"] + doi, 
             params={'email': self.config["unpaywall_email"]}, verify=False, timeout=10).json()
-        if response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
+        if response['best_oa_location'] and 'url_for_pdf' in response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
             return response['best_oa_location']['url_for_pdf']
-        elif response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
+        elif 'url' response['best_oa_location'] in and response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
             return response['best_oa_location']['url']+"/pdf/"
+        
         # we have a look at the other "oa_locations", which might have a `url_for_pdf` ('best_oa_location' has not always a 
         # `url_for_pdf`, for example for Elsevier OA articles)
         for other_oa_location in response['oa_locations']:
             # for a PMC file, we can concatenate /pdf/ to the base, eg https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7029158/pdf/
             # but the downloader will have to use a good User-Agent and follow redirection
-            if other_oa_location['url'].startswith(self.config['pmc_base_web']):
-                return other_oa_location['url']+"/pdf/"
-            if other_oa_location['url_for_pdf']:
+            #if other_oa_location['url'].startswith(self.config['pmc_base_web']):
+            if 'url_for_pdf' in other_oa_location and other_oa_location['url_for_pdf'] != None:
+                if other_oa_location['url_for_pdf'].find('europepmc.org/articles/pmc') != -1 or other_oa_location['url_for_pdf'].find('ncbi.nlm.nih.gov/pmc/articles') != -1:
+                    return other_oa_location['url']+"/pdf/"
+
+        # last choice, non PMC url to pdf
+        for other_oa_location in response['oa_locations']:
+            if 'url_for_pdf' in other_oa_location and other_oa_location['url_for_pdf'] != None:
                 return other_oa_location['url_for_pdf']
         return None
 
@@ -798,35 +804,33 @@ class Harverster(object):
         localUrl = None
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
 
-            # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
-            '''
-            if "pmcid" in localJson:
-                localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
-                if localUrl is None:
-                    logging.debug("no PMC oa valid url: " + localJson["pmcid"])
-            '''
-
-            if localUrl is None:
-                # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
-                # obtained from the Elsevier COVID-19 ftp
-                if "pii" in localJson:
-                    local_pii = localJson['pii']
-                else:
-                    local_pii = None
-                if "DOI" in localJson:
-                    local_doi = localJson['DOI'].lower() 
-                else:
-                    local_doi = None
-                local_elsevier = self.elsevier_oa_check(doi=local_doi,pii=local_pii)
-                if local_elsevier is not None and os.path.isfile(local_elsevier):
-                    localUrl = "file://" + local_elsevier
+            # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
+            # obtained from the Elsevier COVID-19 ftp
+            if "pii" in localJson:
+                local_pii = localJson['pii']
+            else:
+                local_pii = None
+            if "DOI" in localJson:
+                local_doi = localJson['DOI'].lower() 
+            else:
+                local_doi = None
+            local_elsevier = self.elsevier_oa_check(doi=local_doi,pii=local_pii)
+            if local_elsevier is not None and os.path.isfile(local_elsevier):
+                localUrl = "file://" + local_elsevier
 
             # check if the PDF and metadata are available in the legacy repo
-            if "legacy_data_path" in self.config and len(self.config["legacy_data_path"].strip())>0:
+            if localUrl is None and "legacy_data_path" in self.config and len(self.config["legacy_data_path"].strip())>0:
                 dest_path = generateStoragePath(identifier)
                 old_pdf_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".pdf")
                 if os.path.exists(old_pdf_filename) and _is_valid_file(old_pdf_filename, "pdf"):
                     localUrl = "file://" + old_pdf_filename
+
+            # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
+            if localUrl is None:
+                if "pmcid" in localJson:
+                    localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
+                    if localUrl is None:
+                        logging.debug("no PMC oa valid url: " + localJson["pmcid"])
 
             if localUrl is None:
                 try:
@@ -842,7 +846,7 @@ class Harverster(object):
 
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
-                    # we can try to use the OA link from bibilio-glutton as fallback (though not very optimistic on this!)
+                    # we can try to use the OA link from biblio-glutton as fallback (though not very optimistic on this!)
                     localUrl = localJson["oaLink"]
             else:
                 localJson["oaLink"] = localUrl
@@ -866,6 +870,11 @@ class Harverster(object):
                         # an existing pdf has been archive fot this unique identifier, let's reuse it
                         shutil.copy(old_pdf_filename, pdf_filename)
                         localJson["has_valid_pdf"] = True
+                        # set back the original online url
+                        try:
+                            localJson["oaLink"] = self.unpaywalling_doi(localJson['DOI'])
+                        except:
+                            logging.debug("Unpaywall API call for finding Open URL not succesful")   
 
                     # check if we have also a nlm file already downloaded
                     old_nlm_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".nxml")
@@ -873,6 +882,11 @@ class Harverster(object):
                         # an existing pdf has been archive fot this unique identifier, let's reuse it
                         nlm_filename = os.path.join(self.config["data_path"], identifier+".nxml")
                         shutil.copy(old_nlm_filename, nlm_filename)
+                        # set back the original online url
+                        try:
+                            localJson["oaLink"] = self.unpaywalling_doi(localJson['DOI'])
+                        except:
+                            logging.debug("Unpaywall API call for finding Open URL not succesful")   
 
                 if not localJson["has_valid_pdf"]:
                     localUrl = localJson["oaLink"]
