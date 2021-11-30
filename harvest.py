@@ -24,6 +24,7 @@ import lmdb
 from tqdm import tqdm
 import logging
 import logging.handlers
+from random import randint, choices
 
 map_size = 100 * 1024 * 1024 * 1024 
 logging.basicConfig(filename='harvester.log', filemode='w', level=logging.DEBUG)
@@ -305,7 +306,7 @@ class Harverster(object):
         if not success and doi is not None and len(doi)>0:
             # let's call crossref as fallback for the X-months gap
             # https://api.crossref.org/works/10.1037/0003-066X.59.1.29
-            user_agent = {'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0 (mailto:' 
+            user_agent = {'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0 (mailto:' 
                 + self.config['crossref_email'] + ')'} 
             response = requests.get(self.config['crossref_base']+"/works/"+doi, headers=user_agent, verify=False, timeout=5)
             if response.status_code == 200:
@@ -1318,6 +1319,18 @@ def _check_compression(file):
             return True
     return False
 
+def _get_random_user_agent():
+    '''
+    This is a simple random/rotating user agent covering different devices and web clients/browsers
+    Note: rotating the user agent without rotating the IP address (via proxies) might not be a good idea if the same server
+    is harvested - but in our case we are harvesting a large variety of different Open Access servers
+    '''
+    user_agents = ["Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0",
+                   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36",
+                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"]
+    weights = [0.2, 0.3, 0.5]
+    user_agent = choices(user_agents, weights=weights, k=1)
+
 def _is_valid_file(file, mime_type):
     target_mime = []
     if mime_type == 'xml':
@@ -1374,11 +1387,13 @@ def _download_wget(url, filename):
     result = "fail"
     # This is the most robust and reliable way to download files I found with Python... to rely on system wget :)
     #cmd = "wget -c --quiet" + " -O " + filename + ' --connect-timeout=10 --waitretry=10 ' + \
-    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=10 --waitretry=0 --tries=5 --retry-connrefused ' + \
-        '--header="User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0" ' + \
+
+    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=15 --waitretry=0 --tries=5 --retry-connrefused ' + \
+        '--header="User-Agent: ' + _get_random_user_agent()+ '" ' + \
         '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
         '--no-check-certificate ' + \
         '"' + url + '"'
+
     logging.debug(cmd)
     try:
         result = subprocess.check_call(cmd, shell=True)
@@ -1423,16 +1438,16 @@ def _download_requests(url, filename):
     """ 
     Download with Python requests which handle well compression, but not very robust and bad parallelization
     """
-    HEADERS = {"""User-Agent""": """Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0"""}
+    HEADERS = {"""User-Agent""": _get_random_user_agent()}
     result = "fail" 
     try:
-        file_data = requests.get(url, allow_redirects=True, headers=HEADERS, verify=False, timeout=10)
+        file_data = requests.get(url, allow_redirects=True, headers=HEADERS, verify=False, timeout=30)
         if file_data.status_code == 200:
             with open(filename, 'wb') as f_out:
                 f_out.write(file_data.content)
             result = "success"
     except Exception:
-        logging.error("Download failed for {0} with requests".format(url))
+        logging.exception("Download failed for {0} with requests".format(url))
     return result
 
 def _manage_pmc_archives(filename):
