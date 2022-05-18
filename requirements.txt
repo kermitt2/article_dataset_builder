@@ -3,3 +3,5 @@ python-magic==0.4.15
 lmdb==0.94
 tqdm==4.21
 requests
+cloudscraper==1.2.60
+beautifulsoup4==4.10.0

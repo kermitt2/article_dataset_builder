@@ -24,11 +24,15 @@ import lmdb
 from tqdm import tqdm
 import logging
 import logging.handlers
+import cloudscraper
+from bs4 import BeautifulSoup
 
 map_size = 100 * 1024 * 1024 * 1024 
 logging.basicConfig(filename='harvester.log', filemode='w', level=logging.DEBUG)
 
 urllib3.disable_warnings()
+
+scraper = cloudscraper.create_scraper(interpreter='nodejs')
 
 class Harverster(object):
     """
@@ -708,7 +712,7 @@ class Harverster(object):
         self.updateIdentifierMap(localJson)
         self.processTask(localJson)
             
-    def processEntryCord19(self, identifier, row):
+    def processEntryCord19(self, identifier, row, timeout=50):
         # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
         # WHO #Covidence,has_full_text,full_text_file,url  
         localJson = None        
@@ -1251,9 +1255,44 @@ def _grobid_url(grobid_base, grobid_port):
     return the_url
 
 def _download(url, filename):
-    result = _download_wget(url, filename)
+    #result = _download_wget(url, filename)
+    result = _download_cloudscraper(url, filename)
     if result != "success":
         result = _download_requests(url, filename)
+    return result
+
+def _download_cloudscraper(url, filename, n=0, timeout_in_seconds=30):
+    """
+    Use a cloudscraper session for downloading Cloudflare protected file. 
+    Header agant generation is managed by cloudscraper.
+    Websites not using Cloudflare will be treated like normal requests call. 
+
+    See https://github.com/VeNoMouS/cloudscraper for more options (e.g. proxy, captcha solver)
+    """
+    global scraper
+    result = "fail"
+    try:
+        file_data = scraper.get(url, timeout=timeout_in_seconds)
+        if file_data.status_code == 200:
+            if filename.endsWith(".pdf"):
+                if file_data.text[:5] == '%PDF-':
+                    with open(filename, 'wb') as f_out:
+                        f_out.write(file_data.content)
+                    result = "success"
+                elif n < 5:
+                    soup = BeautifulSoup(file_data.text, 'html.parser')
+                    if soup.select_one('a#redirect'):
+                        redirect_url = soup.select_one('a#redirect')['href']
+                        logging.debug('Waiting 5 seconds before following redirect url')
+                        sleep(5)
+                        logging.debug(f'Retry number {n + 1}')
+                        return _download_cloudscraper(redirect_url, n=n+1, timeout_in_seconds=timeout_in_seconds)
+            else:
+                with open(filename, 'wb') as f_out:
+                    f_out.write(file_data.content)
+                    result = "success"
+    except Exception:
+        logging.exception("Download failed for {0} with cloudscraper".format(url))
     return result
 
 def _download_wget(url, filename):
