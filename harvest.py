@@ -26,6 +26,8 @@ import logging
 import logging.handlers
 import cloudscraper
 from bs4 import BeautifulSoup
+from random import randint, choices
+
 
 map_size = 100 * 1024 * 1024 * 1024 
 logging.basicConfig(filename='harvester.log', filemode='w', level=logging.DEBUG)
@@ -200,18 +202,24 @@ class Harverster(object):
         """
         response = requests.get(self.config["unpaywall_base"] + doi, 
             params={'email': self.config["unpaywall_email"]}, verify=False, timeout=10).json()
-        if response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
+        if response['best_oa_location'] and 'url_for_pdf' in response['best_oa_location'] and response['best_oa_location']['url_for_pdf']:
             return response['best_oa_location']['url_for_pdf']
-        elif response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
+        elif 'url' in response['best_oa_location'] and response['best_oa_location']['url'].startswith(self.config['pmc_base_web']):
             return response['best_oa_location']['url']+"/pdf/"
+        
         # we have a look at the other "oa_locations", which might have a `url_for_pdf` ('best_oa_location' has not always a 
         # `url_for_pdf`, for example for Elsevier OA articles)
         for other_oa_location in response['oa_locations']:
             # for a PMC file, we can concatenate /pdf/ to the base, eg https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7029158/pdf/
             # but the downloader will have to use a good User-Agent and follow redirection
-            if other_oa_location['url'].startswith(self.config['pmc_base_web']):
-                return other_oa_location['url']+"/pdf/"
-            if other_oa_location['url_for_pdf']:
+            #if other_oa_location['url'].startswith(self.config['pmc_base_web']):
+            if 'url_for_pdf' in other_oa_location and other_oa_location['url_for_pdf'] != None:
+                if other_oa_location['url_for_pdf'].find('europepmc.org/articles/pmc') != -1 or other_oa_location['url_for_pdf'].find('ncbi.nlm.nih.gov/pmc/articles') != -1:
+                    return other_oa_location['url']+"/pdf/"
+
+        # last choice, non PMC url to pdf
+        for other_oa_location in response['oa_locations']:
+            if 'url_for_pdf' in other_oa_location and other_oa_location['url_for_pdf'] != None:
                 return other_oa_location['url_for_pdf']
         return None
 
@@ -303,7 +311,7 @@ class Harverster(object):
         if not success and doi is not None and len(doi)>0:
             # let's call crossref as fallback for the X-months gap
             # https://api.crossref.org/works/10.1037/0003-066X.59.1.29
-            user_agent = {'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0 (mailto:' 
+            user_agent = {'User-agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0 (mailto:' 
                 + self.config['crossref_email'] + ')'} 
             response = requests.get(self.config['crossref_base']+"/works/"+doi, headers=user_agent, verify=False, timeout=5)
             if response.status_code == 200:
@@ -644,7 +652,7 @@ class Harverster(object):
             print("processed", str(line_count), "article PMC ID")
 
     def processEntryDOI(self, identifier, doi):
-        localJson = None        
+        localJson = None
 
         # if the entry has already been processed (partially or completely), we reuse the entry 
         with self.env_entries.begin(write=False) as txn:
@@ -802,35 +810,33 @@ class Harverster(object):
         localUrl = None
         if not localJson["has_valid_oa_url"] or not localJson["has_valid_pdf"]:
 
-            # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
-            '''
-            if "pmcid" in localJson:
-                localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
-                if localUrl is None:
-                    logging.debug("no PMC oa valid url: " + localJson["pmcid"])
-            '''
-
-            if localUrl is None:
-                # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
-                # obtained from the Elsevier COVID-19 ftp
-                if "pii" in localJson:
-                    local_pii = localJson['pii']
-                else:
-                    local_pii = None
-                if "DOI" in localJson:
-                    local_doi = localJson['DOI'].lower() 
-                else:
-                    local_doi = None
-                local_elsevier = self.elsevier_oa_check(doi=local_doi,pii=local_pii)
-                if local_elsevier is not None and os.path.isfile(local_elsevier):
-                    localUrl = "file://" + local_elsevier
+            # for CORD-19, we test if we have an Elsevier OA publication, if yes we can check the local PDF store 
+            # obtained from the Elsevier COVID-19 ftp
+            if "pii" in localJson:
+                local_pii = localJson['pii']
+            else:
+                local_pii = None
+            if "DOI" in localJson:
+                local_doi = localJson['DOI'].lower() 
+            else:
+                local_doi = None
+            local_elsevier = self.elsevier_oa_check(doi=local_doi,pii=local_pii)
+            if local_elsevier is not None and os.path.isfile(local_elsevier):
+                localUrl = "file://" + local_elsevier
 
             # check if the PDF and metadata are available in the legacy repo
-            if "legacy_data_path" in self.config and len(self.config["legacy_data_path"].strip())>0:
+            if localUrl is None and "legacy_data_path" in self.config and len(self.config["legacy_data_path"].strip())>0:
                 dest_path = generateStoragePath(identifier)
                 old_pdf_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".pdf")
                 if os.path.exists(old_pdf_filename) and _is_valid_file(old_pdf_filename, "pdf"):
                     localUrl = "file://" + old_pdf_filename
+
+            # for PMC, we can use NIH ftp server for retrieving the PDF and XML NLM file
+            if localUrl is None:
+                if "pmcid" in localJson:
+                    localUrl, _ = self.pmc_oa_check(pmcid=localJson["pmcid"])
+                    if localUrl is None:
+                        logging.debug("no PMC oa valid url: " + localJson["pmcid"])
 
             if localUrl is None:
                 try:
@@ -846,7 +852,7 @@ class Harverster(object):
 
             if localUrl is None or len(localUrl) == 0:
                 if "oaLink" in localJson:
-                    # we can try to use the OA link from bibilio-glutton as fallback (though not very optimistic on this!)
+                    # we can try to use the OA link from biblio-glutton as fallback (though not very optimistic on this!)
                     localUrl = localJson["oaLink"]
             else:
                 localJson["oaLink"] = localUrl
@@ -870,6 +876,11 @@ class Harverster(object):
                         # an existing pdf has been archive fot this unique identifier, let's reuse it
                         shutil.copy(old_pdf_filename, pdf_filename)
                         localJson["has_valid_pdf"] = True
+                        # set back the original online url
+                        try:
+                            localJson["oaLink"] = self.unpaywalling_doi(localJson['DOI'])
+                        except:
+                            logging.debug("Unpaywall API call for finding Open URL not succesful")   
 
                     # check if we have also a nlm file already downloaded
                     old_nlm_filename = os.path.join(self.config["legacy_data_path"], dest_path, identifier+".nxml")
@@ -877,6 +888,11 @@ class Harverster(object):
                         # an existing pdf has been archive fot this unique identifier, let's reuse it
                         nlm_filename = os.path.join(self.config["data_path"], identifier+".nxml")
                         shutil.copy(old_nlm_filename, nlm_filename)
+                        # set back the original online url
+                        try:
+                            localJson["oaLink"] = self.unpaywalling_doi(localJson['DOI'])
+                        except:
+                            logging.debug("Unpaywall API call for finding Open URL not succesful")   
 
                 if not localJson["has_valid_pdf"]:
                     localUrl = localJson["oaLink"]
@@ -1038,7 +1054,7 @@ class Harverster(object):
         txn = self.env_uuid.begin()
         return txn.get(strong_identifier.encode(encoding='UTF-8'))
 
-    def diagnostic(self, full=False):
+    def diagnostic(self, full=False, metadata_csv_file=None, cord19=False):
         """
         Print a report on failures stored during the harvesting process
         """
@@ -1127,6 +1143,103 @@ class Harverster(object):
             print("total entries with at least one TEI file:", str(nb_tei_present))
             print("---")
 
+            if metadata_csv_file != None and cord19:
+                # adding some statistics on the CORD-19 entries
+
+                # first get the number of entries to be able to display a progress bar
+                nb_lines = 0
+                with open(metadata_csv_file, mode='r') as csv_file:
+                    csv_reader = csv.DictReader(csv_file)
+                    for row in csv_reader:
+                        nb_lines += 1
+
+                collection = {}
+                collection["name"] = "CORD-19"
+                collection["description"] = "Collection of Open Access research publications on COVID-19"
+                collection["version"] = "version of the collection - to be edited"
+                collection["harvester"] = "article-dataset-builder"
+                collection["documents"] = {}
+                collection["documents"]["distribution_entries_per_year"] = {}
+                collection["documents"]["distribution_harvested_per_year"] = {}
+
+                print("generating collection description/statistics on CORD-19 entries...")
+                total_entries = 0
+                total_distinct_entries = 0
+                total_harvested_entries = 0
+                distribution_years = {}
+                distribution_years_harvested = {}
+
+                # not memory friendly, but it's okay with modern computer... otherwise we will use another temporary lmdb 
+                cord_ids = []
+
+                # format is: 
+                # cord_uid,sha,source_x,title,doi,pmcid,pubmed_id,license,abstract,publish_time,authors,journal,Microsoft Academic Paper ID,
+                # WHO #Covidence,has_full_text,full_text_file,url
+                pbar = tqdm(total = nb_lines)
+                nb_lines = 0                
+                with open(metadata_csv_file, mode='r') as csv_file:
+                    csv_reader = csv.DictReader(csv_file)
+                    line_count = 0 # total count of articles
+                    i = 0 # counter for article per batch
+                    identifiers = []
+                    rows = []
+                    for row in tqdm(csv_reader, total=total_entries):
+                        nb_lines += 1
+                        if nb_lines % 100 == 0:
+                            pbar.update(100)
+
+                        if row["cord_uid"] == None or len(row["cord_uid"]) == 0:
+                            continue
+
+                        # is it indexed?
+                        cord_id = row["cord_uid"]
+                        if cord_id in cord_ids:
+                            # this is a duplicate
+                            continue
+
+                        cord_ids.append(cord_id)
+
+                        total_distinct_entries += 1
+                        
+                        # check if we have a full text for the entry (nlm/tei or pdf)
+                        harvested = False
+                        resource_path = generateStoragePath(cord_id)
+                        if os.path.isfile(os.path.join(resource_path, cord_id+".pdf")) or \
+                            os.path.isfile(os.path.join(resource_path, cord_id+".nxml")) or \
+                            os.path.isfile(os.path.join(resource_path, cord_id+".grobid.tei.xml")):
+                            total_harvested_entries =+1
+                            harvested = True
+
+                        # publishing date has ISO 8601 style format: 2000-08-15 
+                        if row["publish_time"]:
+                            year = row["publish_time"].split("-")[0]
+
+                            if not year in distribution_years:
+                                distribution_years[year] = 1
+                            else:
+                                distribution_years[year] += 1
+
+                            if harvested:
+                                if not year in distribution_years_harvested:
+                                    distribution_years_harvested[year] = 1
+                                else:
+                                    distribution_years_harvested[year] += 1
+
+                print("Collection description and statistics generated in file: ./collection.json")
+                collection["documents"]["total_entries"] = total_entries
+                collection["documents"]["total_distinct_entries"] = total_distinct_entries
+                collection["documents"]["total_harvested_entries"] = total_harvested_entries
+
+                for year in distribution_years:
+                    collection["documents"]["distribution_entries_per_year"][year] = distribution_years[year]
+
+                for year in distribution_years_harvested:
+                    collection["documents"]["distribution_harvested_per_year"][year] = distribution_years_harvested[year]
+
+                with open('collection.json', 'w') as outfile:
+                    json.dump(collection, outfile, indent=4)
+
+
     def reprocessFailed(self):
         localJsons = []
         i = 0
@@ -1210,6 +1323,18 @@ def _check_compression(file):
         else:
             return True
     return False
+
+def _get_random_user_agent():
+    '''
+    This is a simple random/rotating user agent covering different devices and web clients/browsers
+    Note: rotating the user agent without rotating the IP address (via proxies) might not be a good idea if the same server
+    is harvested - but in our case we are harvesting a large variety of different Open Access servers
+    '''
+    user_agents = ["Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0",
+                   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36",
+                   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"]
+    weights = [0.2, 0.3, 0.5]
+    user_agent = choices(user_agents, weights=weights, k=1)
 
 def _is_valid_file(file, mime_type):
     target_mime = []
@@ -1302,11 +1427,13 @@ def _download_wget(url, filename):
     result = "fail"
     # This is the most robust and reliable way to download files I found with Python... to rely on system wget :)
     #cmd = "wget -c --quiet" + " -O " + filename + ' --connect-timeout=10 --waitretry=10 ' + \
-    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=10 --waitretry=0 --tries=5 --retry-connrefused ' + \
-        '--header="User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:81.0) Gecko/20100101 Firefox/81.0" ' + \
+
+    cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=15 --waitretry=0 --tries=5 --retry-connrefused ' + \
+        '--header="User-Agent: ' + _get_random_user_agent()+ '" ' + \
         '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
         '--no-check-certificate ' + \
         '"' + url + '"'
+
     logging.debug(cmd)
     try:
         result = subprocess.check_call(cmd, shell=True)
@@ -1351,16 +1478,16 @@ def _download_requests(url, filename):
     """ 
     Download with Python requests which handle well compression, but not very robust and bad parallelization
     """
-    HEADERS = {"""User-Agent""": """Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0"""}
+    HEADERS = {"""User-Agent""": _get_random_user_agent()}
     result = "fail" 
     try:
-        file_data = requests.get(url, allow_redirects=True, headers=HEADERS, verify=False, timeout=10)
+        file_data = requests.get(url, allow_redirects=True, headers=HEADERS, verify=False, timeout=30)
         if file_data.status_code == 200:
             with open(filename, 'wb') as f_out:
                 f_out.write(file_data.content)
             result = "success"
     except Exception:
-        logging.error("Download failed for {0} with requests".format(url))
+        logging.exception("Download failed for {0} with requests".format(url))
     return result
 
 def _manage_pmc_archives(filename):

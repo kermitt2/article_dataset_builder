@@ -176,6 +176,12 @@ To reset entirely an existing harvesting and re-start an harvesting from zero:
 python3 harvest.py --cord19 metadata.csv --reset --config my_config.json  
 ```
 
+To only download full texts (PDF and JATS/NLM) without GROBID processing, use `--download` parameter:
+
+```console
+python3 harvest.py --cord19 metadata.csv --config my_config.json --download
+```
+
 To create a dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing), add the parameter `--dump`:
 
 ```console
