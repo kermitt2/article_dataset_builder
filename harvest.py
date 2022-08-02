@@ -1488,6 +1488,9 @@ def _download_wget(url, filename):
 
 
 def _download_ftp(url, filename):
+    """
+    https://stackoverflow.com/questions/11768214/python-download-a-file-from-an-ftp-server
+    """
     result = "fail"
     try:
         with closing(request.urlopen(url)) as r:
