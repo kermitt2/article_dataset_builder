@@ -2,8 +2,10 @@ import argparse
 import os
 import io
 import sys
+from contextlib import closing
+
 import urllib3
-from urllib import parse
+from urllib import parse, request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import argparse
 import boto3
@@ -16,6 +18,9 @@ import tarfile
 import json
 import pickle
 import subprocess
+
+from requests.exceptions import InvalidSchema
+
 import S3
 import csv
 import time
@@ -1383,10 +1388,15 @@ def _download(url, filename):
     #result = _download_wget(url, filename)
     result = _download_cloudscraper(url, filename)
     if result != "success":
-        result = _download_requests(url, filename)
+        if str(url).startswith("ftp"):
+            result = _download_ftp(url, filename)
+            # if result != "success":
+            #     result = _download_wget(url, filename)
+        else:
+            result = _download_requests(url, filename)
     return result
 
-def _download_cloudscraper(url, filename, n=0, timeout_in_seconds=30):
+def _download_cloudscraper(url, filename: str, n=0, timeout_in_seconds=30):
     """
     Use a cloudscraper session for downloading Cloudflare protected file. 
     Header agant generation is managed by cloudscraper.
@@ -1397,9 +1407,9 @@ def _download_cloudscraper(url, filename, n=0, timeout_in_seconds=30):
     global scraper
     result = "fail"
     try:
-        file_data = scraper.get(url, timeout=timeout_in_seconds)
+        file_data = scraper.get(str(url).strip(), timeout=timeout_in_seconds)
         if file_data.status_code == 200:
-            if filename.endsWith(".pdf"):
+            if filename.endswith(".pdf"):
                 if file_data.text[:5] == '%PDF-':
                     with open(filename, 'wb') as f_out:
                         f_out.write(file_data.content)
@@ -1409,7 +1419,7 @@ def _download_cloudscraper(url, filename, n=0, timeout_in_seconds=30):
                     if soup.select_one('a#redirect'):
                         redirect_url = soup.select_one('a#redirect')['href']
                         logging.debug('Waiting 5 seconds before following redirect url')
-                        sleep(5)
+                        time.sleep(5)
                         logging.debug(f'Retry number {n + 1}')
                         return _download_cloudscraper(redirect_url, n=n+1, timeout_in_seconds=timeout_in_seconds)
             else:
@@ -1418,6 +1428,8 @@ def _download_cloudscraper(url, filename, n=0, timeout_in_seconds=30):
                     result = "success"
     except Exception:
         logging.exception("Download failed for {0} with cloudscraper".format(url))
+    except InvalidSchema:
+        logging.exception("Download failed (invalid schema) for {0} with cloudscraper".format(url))
     return result
 
 def _download_wget(url, filename):
@@ -1473,6 +1485,22 @@ def _download_wget(url, filename):
         result = "fail"
 
     return str(result)
+
+
+def _download_ftp(url, filename):
+    """
+    https://stackoverflow.com/questions/11768214/python-download-a-file-from-an-ftp-server
+    """
+    result = "fail"
+    try:
+        with closing(request.urlopen(url)) as r:
+            with open(filename, 'wb') as f:
+                shutil.copyfileobj(r, f)
+                result = "success"
+    except Exception as e:
+        logging.exception("Download failed for {0} with ftp adapter".format(url))
+    return result
+
 
 def _download_requests(url, filename):
     """ 
