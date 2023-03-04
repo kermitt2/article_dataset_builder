@@ -52,10 +52,11 @@ class Harverster(object):
     Usage: see the Readme.md file
     """
 
-    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False, only_download=False, full_diagnostic=False):
+    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False, only_download=False, only_dump=False, full_diagnostic=False):
         # boolean indicating if we only want to download the raw files without structuring them into XML
         self.only_download = only_download
         self.full_diagnostic = full_diagnostic
+        self.only_dump = only_dump
 
         self.config = None   
         self._load_config(config_path)
@@ -102,14 +103,18 @@ class Harverster(object):
         self.config = json.loads(config_json)
 
         # test if GROBID is up and running, except if we just want to download raw files
-        if not self.only_download and not self.full_diagnostic:
+        if not self.only_download and not self.full_diagnostic and not self.only_dump:
             the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
             the_url += "isalive"
-            r = requests.get(the_url)
-            if r.status_code != 200:
-                logging.warning('GROBID server does not appear up and running ' + str(r.status_code))
-            else:
-                logging.info("GROBID server is up and running")
+            try:
+                r = requests.get(the_url)
+                if r.status_code != 200:
+                    logging.warning('GROBID server does not appear up and running ' + str(r.status_code))
+                else:
+                    logging.info("GROBID server is up and running")
+            except:
+                logging.error("GROBID server is not available")
+                print("GROBID server is not available, next processing steps might raise some issues")
 
     def _init_local_file_map(self):
         # build the local file map, if any, for the Elsevier COVID-19 OA set
@@ -363,7 +368,7 @@ class Harverster(object):
         txn = self.env_entries.begin(write=True)
         
         nb_total = txn.stat()['entries']
-        print("number of harvested entries:", nb_total)
+        print("\nnumber of harvested entries:", nb_total)
 
         with open(self.dump_file_name,'w') as file_out:
             # iterate over lmdb
@@ -375,11 +380,56 @@ class Harverster(object):
                 file_out.write(json.dumps(local_entry, sort_keys=True))
                 file_out.write("\n")
 
+        logging.info("Full metadata dump written in " + self.dump_file_name)
+        print("\n-> Full metadata dump written in", self.dump_file_name)
+
         # we need to upload to S3 the consolidated metadata file, if S3 has been set
         if self.s3 is not None:
             if os.path.isfile(self.dump_file_name):
                 self.s3.upload_file_to_s3(self.dump_file_name, ".", storage_class='ONEZONE_IA')
 
+    def write_catalogue(self, catalogue_file_name="map.json"):
+        # init lmdb transactions
+        txn = self.env_entries.begin(write=True)
+        
+        nb_total = txn.stat()['entries']
+        print("\nnumber of harvested entries:", nb_total)
+
+        catalogue_file_path = os.path.join(self.config["data_path"], catalogue_file_name)
+
+        with open(catalogue_file_path,'w') as file_out:
+            # iterate over lmdb
+            cursor = txn.cursor()
+            for key, value in cursor:
+                if txn.get(key) is None:
+                    continue
+                local_entry = _deserialize_pickle(txn.get(key))
+                file_out.write('{"id": "' + local_entry["id"] + '"')
+                if "DOI" in local_entry:
+                    file_out.write(', "DOI": "' + local_entry["DOI"] + '"')
+                if "doi" in local_entry:
+                    file_out.write(', "DOI": "' + local_entry["doi"] + '"')
+                if "pmid" in local_entry:
+                    file_out.write(', "pmid": "' + local_entry["pmid"] + '"')
+                if "pmcid" in local_entry:
+                    file_out.write(', "pmcid": "' + local_entry["pmcid"] + '"')
+                if "oaLink" in local_entry:
+                    file_out.write(', "oaLink": "' + local_entry["oaLink"] + '"')
+                if "has_valid_pdf" in local_entry and local_entry["has_valid_pdf"] and "data_path" in local_entry:
+                    file_out.write(', "pdf_file_path": "' + local_entry["data_path"] + local_entry["id"] + '.pdf"')
+                if "has_valid_tei" in local_entry and local_entry["has_valid_tei"] and "data_path" in local_entry:
+                    file_out.write(', "tei_file_path": "' + local_entry["data_path"] + local_entry["id"] + '.tei.xml"')
+                file_out.write(', "json_metadata_file_path": "' + local_entry["data_path"] + local_entry["id"] + '.json"')
+
+                file_out.write("}\n")
+
+        logging.info("Catalogue of harvested resources written in " + catalogue_file_path)
+        print("\n-> Catalogue of harvested resources written in", catalogue_file_path)
+
+        # we need to upload to S3 the catalogue file, if S3 has been set
+        if self.s3 is not None:
+            if os.path.isfile(catalogue_file_name):
+                self.s3.upload_file_to_s3(catalogue_file_name, ".", storage_class='ONEZONE_IA')
 
     def run_grobid(self, pdf_file, output=None, annotation_output=None):
         # normal fulltext TEI file
@@ -1083,7 +1133,7 @@ class Harverster(object):
         print("---")
         print("total entries:", nb_total)
         print("---")
-        print("total valid entries:", nb_total_valid, "entries with valid OA URL and PDF and TEI XML")
+        print("total fully successful entries:", nb_total_valid, "entries with valid OA URL and PDF and TEI XML")
         print("---")
         print("total invalid OA URL:", nb_invalid_oa_url)
         print("total entries with valid OA URL:", str(nb_total-nb_invalid_oa_url))
@@ -1635,11 +1685,7 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    if full_diagnostic:
-        harvester.diagnostic(full=full_diagnostic)
-    elif dump :
-        harvester.dump_metadata()
-    elif reprocess:
+    if reprocess:
         harvester.reprocessFailed()        
     elif csv_cord19:
         if not os.path.isfile(csv_cord19):
@@ -1662,5 +1708,15 @@ if __name__ == "__main__":
             sys.exit(0)    
         harvester.harvest_pmcids(pmcids_path)
 
+    if reprocess or csv_cord19 or dois_path or pmids_path or pmcids_path:
+        harvester.write_catalogue()
+
+    if full_diagnostic:
+        harvester.diagnostic(full=full_diagnostic)
+
+    if dump:
+        harvester.only_dump = True
+        harvester.dump_metadata()
+
     runtime = round(time.time() - start_time, 3)
-    print("runtime: %s seconds " % (runtime))
+    print("\nruntime: %s seconds " % (runtime))

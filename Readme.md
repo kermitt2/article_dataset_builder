@@ -22,11 +22,11 @@ To do:
 
 - Harvest PDF from the specification of the article set (list of strong identifiers or basic metadata provided in a csv file), typically PDF available in Open Access PDF via the [Unpaywall API](https://unpaywall.org/products/api) (and some heuristics) 
 
-- Perform [Grobid](https://github.com/kermitt2/grobid) full processing of PDF (including bibliographical reference consolidation and OA access resolution of the cited references), converting them into structured XML TEI
+- Perform [Grobid](https://github.com/kermitt2/grobid) full processing of PDF (including bibliographical reference consolidation and OA access resolution of the cited references), converting them into structured XML TEI (optional)
 
 - For PMC files (Open Access set only), harvest also XML JATS (NLM) files and perform a conversion into XML TEI (same TEI customization as Grobid) via [Pub2TEI](https://github.com/kermitt2/Pub2TEI)
 
-Optionally: 
+In addition, optionally: 
 
 - Generate thumbnails for article (based on the first page of the PDF), small/medium/large 
 
@@ -57,7 +57,7 @@ brew install libmagic
 
 ### Third party services
 
-The following tools need to be installed and running, with access information specified in the configuration file (`config.json`):
+The following tools need to be installed/accessed and running, with access information specified in the configuration file (`config.json`):
 
 - [Grobid](https://github.com/kermitt2/grobid), for converting PDF into XML TEI
 
@@ -152,9 +152,7 @@ For instance for the [CORD-19 dataset](https://pages.semanticscholar.org/coronav
 python3 harvest.py --cord19 metadata.csv  
 ```
 
-This will generate a consolidated metadata file (specified by `--out`,  or `consolidated_metadata.json` by default), upload full text files, 
-converted tei.xml files and other optional files either in the local file system (under data_path indicated in the config.json 
-file) or on a S3 bucket if the fields are filled in config.json. 
+An harvesting will generate a JSONL mapping file with the UUID associated with to the Open Access full text resource and the main identifiers of the entries under the data path specified in the configuration file and named `map.json`. The harvesting uploads full text files, converted tei.xml files and other optional files either in the local file system (under data_path indicated in the `config.json` file) or on a S3 bucket if the fields are filled in `config.json`. 
 
 You can set a specific config file name with `--config` :
 
@@ -182,7 +180,7 @@ To only download full texts (PDF and JATS/NLM) without GROBID processing, use `-
 python3 harvest.py --cord19 metadata.csv --config my_config.json --download
 ```
 
-To create a dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing), add the parameter `--dump`:
+To create a full dump of the consolidated metadata of all the processed files (including the UUID identifier and the state of processing), add the parameter `--dump`:
 
 ```console
 python3 harvest.py --dump --config my_config.json  
@@ -202,7 +200,7 @@ For producing PDF annotations in JSON format corresponding to the bibliographica
 python3 harvest.py --cord19 metadata.csv --annotation --config my_config.json  
 ```
 
-Finally you can run a short diagnostic/reporting on the latest harvesting like this:
+Finally you can run a short diagnostic/reporting on the latest harvesting by adding `--diagnostic` (combined to any previous harvesting command line, or just as unique parameter, to make a diagnostic to the realized harvesting):
 
 ```console
 python3 harvest.py --diagnostic --config my_config.json  
@@ -233,7 +231,7 @@ Optional additional files:
 98/da/17/ff/98da17ff-bf7e-4d43-bdf2-4d8d831481e5/98da17ff-bf7e-4d43-bdf2-4d8d831481e5-thumb-large.png
 ```
 
-The UUID identifier for a particular article is given in the generated `consolidated_metadata.csv` file (obtained with option `--dump`, see above).
+The UUID identifier for a particular article is given in the generated `map.json` file under the data path, associated to the every document identifiers. The UUID is also given in the `consolidated_metadata.csv` file (obtained with option `--dump`, see above).
 
 The `*.nxml` files correspond to the JATS files available for PMC (Open Access set only).
 
@@ -359,10 +357,9 @@ Other main differences include:
 
 ## Converting the PMC XML JATS files into XML TEI
 
-After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is no loss of information from the JATS file.  
+After the harvesting and processing realised by `harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is no loss of information from the JATS file. It requires [Pub2TEI](https://github.com/kermitt2/Pub2TEI) to be installed and the path to Pub2TEI `pub2tei_path` to be set in the `config.json` file of the `article-dataset-builder` project.
 
 To launch the conversion under the default `data/` directory:
-
 
 ```console
 python3 nlm2tei.py
@@ -426,7 +423,7 @@ For citing this software work, please refer to the present GitHub project, toget
     title = {Article Dataset Builder},
     howpublished = {\url{https://github.com/kermitt2/article-dataset-builder}},
     publisher = {GitHub},
-    year = {2020--2021},
+    year = {2020--2023},
     archivePrefix = {swh},
     eprint = {1:dir:adc1581a092560c0ac4a82256c0c905859ec15fc}
 }
