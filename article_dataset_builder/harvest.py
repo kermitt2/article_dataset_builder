@@ -35,7 +35,7 @@ from random import randint, choices
 
 
 map_size = 100 * 1024 * 1024 * 1024 
-logging.basicConfig(filename='harvester.log', filemode='w', level=logging.DEBUG)
+logging.basicConfig(filename='harvester.log', filemode='w', level=logging.INFO)
 
 urllib3.disable_warnings()
 
@@ -374,7 +374,7 @@ class Harverster(object):
         txn = self.env_entries.begin(write=True)
         
         nb_total = txn.stat()['entries']
-        print("\nnumber of harvested entries:", nb_total)
+        print("\ntotal number of harvested entries:", nb_total)
 
         with open(self.dump_file_name,'w') as file_out:
             # iterate over lmdb
@@ -399,7 +399,7 @@ class Harverster(object):
         txn = self.env_entries.begin(write=True)
         
         nb_total = txn.stat()['entries']
-        print("\nnumber of harvested entries:", nb_total)
+        #print("\ntotal number of harvested entries:", nb_total)
 
         catalogue_file_path = os.path.join(self.config["data_path"], catalogue_file_name)
 
@@ -528,45 +528,54 @@ class Harverster(object):
                    logging.error("Writing resulting JSON file %s failed" % annotation_output)
 
     def harvest_dois(self, dois_file):
+        # first get line number for nnumber of articles to harvest
+        # check the overall number of entries based on the line number
+        count = 0
         with open(dois_file, 'rt') as fp:
-            line_count = 0 # total count of articles
+            for line in fp:
+                if len(line.strip())>0:
+                    count += 1
+
+        print("number of articles to harvest:", str(count),"\n")
+
+        with open(dois_file, 'rt') as fp:
             i = 0 # counter for article per batch
             identifiers = []
             dois = []  
-            for count, line in enumerate(fp):
-                if len(line.strip()) == 0:
-                    continue
+            with tqdm(total=count) as pbar:
+                for line in fp:
+                    if len(line.strip()) == 0:
+                        continue
 
-                if i == self.config["batch_size"]:
+                    if i == self.config["batch_size"]:
+                        with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
+                            # branch to the right entry processor, depending on the input csv 
+                            executor.map(self.processEntryDOI, identifiers, dois, timeout=50)
+                        # reinit
+                        i = 0
+                        identifiers = []
+                        dois = []
+
+                    the_doi = line.strip()
+                    the_doi = _clean_doi(the_doi)
+                    # check if the entry has already been processed
+                    identifier = self.getUUIDByStrongIdentifier(the_doi)
+                    if identifier is None:
+                        # we need a new identifier
+                        identifier = str(uuid.uuid4())
+
+                    identifiers.append(identifier)
+                    dois.append(the_doi)
+                    i += 1
+                    pbar.update(1)
+                
+                # we need to process the last incomplete batch, if not empty
+                if len(identifiers) > 0:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                         # branch to the right entry processor, depending on the input csv 
                         executor.map(self.processEntryDOI, identifiers, dois, timeout=50)
-                    # reinit
-                    i = 0
-                    identifiers = []
-                    dois = []
 
-                the_doi = line.strip()
-                the_doi = _clean_doi(the_doi)
-                # check if the entry has already been processed
-                identifier = self.getUUIDByStrongIdentifier(the_doi)
-                if identifier is None:
-                    # we need a new identifier
-                    identifier = str(uuid.uuid4())
-
-                identifiers.append(identifier)
-                dois.append(the_doi)
-    
-                line_count += 1
-                i += 1
-            
-            # we need to process the last incomplete batch, if not empty
-            if len(identifiers) > 0:
-                with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                    # branch to the right entry processor, depending on the input csv 
-                    executor.map(self.processEntryDOI, identifiers, dois, timeout=50)
-
-            print("processed", str(line_count), "articles")
+                #print("processed", str(count), "articles")
 
     def harvest_cord19(self, metadata_csv_file):
         # first get the number of entries to be able to display a progress bar
@@ -628,84 +637,103 @@ class Harverster(object):
             print("processed", str(line_count), "articles from CORD-19")
 
     def harvest_pmids(self, pmids_file):
+        # first get line number for nnumber of articles to harvest
+        # check the overall number of entries based on the line number
+        count = 0
         with open(pmids_file, 'rt') as fp:
-            line_count = 0 # total count of articles
+            for line in fp:
+                if len(line.strip())>0:
+                    count += 1
+
+        print("number of articles to harvest:", str(count),"\n")
+
+        with open(pmids_file, 'rt') as fp:
             i = 0 # counter for article per batch
             identifiers = []
             pmids = []  
-            for count, line in enumerate(fp):
-                if len(line.strip()) == 0:
-                    continue
+            with tqdm(total=count) as pbar:
+                for line in fp:
+                    if len(line.strip()) == 0:
+                        continue
 
-                if i == self.config["batch_size"]:
+                    if i == self.config["batch_size"]:
+                        with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
+                            executor.map(self.processEntryPMID, identifiers, pmids, timeout=50)
+                        # reinit
+                        i = 0
+                        identifiers = []
+                        pmids = []
+
+                    the_pmid = line.strip()
+                    # check if the entry has already been processed
+                    identifier = self.getUUIDByStrongIdentifier(the_pmid)
+                    if identifier is None:
+                        # we need a new identifier
+                        identifier = str(uuid.uuid4())
+                    
+                    identifiers.append(identifier)
+                    pmids.append(the_pmid)
+                    i += 1
+                    pbar.update(1)
+                
+                # we need to process the last incomplete batch, if not empty
+                if len(identifiers) > 0:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                         executor.map(self.processEntryPMID, identifiers, pmids, timeout=50)
-                    # reinit
-                    i = 0
-                    identifiers = []
-                    pmids = []
 
-                the_pmid = line.strip()
-                # check if the entry has already been processed
-                identifier = self.getUUIDByStrongIdentifier(the_pmid)
-                if identifier is None:
-                    # we need a new identifier
-                    identifier = str(uuid.uuid4())
-                
-                identifiers.append(identifier)
-                pmids.append(the_pmid)
-    
-                line_count += 1
-                i += 1
-            
-            # we need to process the last incomplete batch, if not empty
-            if len(identifiers) > 0:
-                with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                    executor.map(self.processEntryPMID, identifiers, pmids, timeout=50)
-
-            print("processed", str(line_count), "article PMID")
+            print("processed", str(count), "article PMID")
 
     def harvest_pmcids(self, pmcids_file):
+        # first get line number for nnumber of articles to harvest
+        # check the overall number of entries based on the line number
+        count = 0
+        with open(pmcids_file, 'rt') as fp:
+            for line in fp:
+                if len(line.strip())>0:
+                    count += 1
+
+        print("number of articles to harvest:", str(count),"\n")
+
         with open(pmcids_file, 'rt') as fp:
             line_count = 0 # total count of articles
             i = 0 # counter for article per batch
             identifiers = []
             pmcids = []  
-            for count, line in enumerate(fp):
-                if len(line.strip()) == 0:
-                    continue
+            with tqdm(total=count) as pbar:
+                for line in fp:
+                    if len(line.strip()) == 0:
+                        continue
 
-                if i == self.config["batch_size"]:
+                    if i == self.config["batch_size"]:
+                        with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
+                            executor.map(self.processEntryPMCID, identifiers, pmcids, timeout=50)
+                        # reinit
+                        i = 0
+                        identifiers = []
+                        pmcids = []
+
+                    the_pmcid = line.strip()
+
+                    if the_pmcid == 'pmc':
+                        continue
+
+                    # check if the entry has already been processed
+                    identifier = self.getUUIDByStrongIdentifier(the_pmcid)
+                    if identifier is None:
+                        # we need a new identifier
+                        identifier = str(uuid.uuid4())
+
+                    identifiers.append(identifier)
+                    pmcids.append(the_pmcid)
+                    i += 1
+                    pbar.update(1)
+                
+                # we need to process the last incomplete batch, if not empty
+                if len(identifiers) > 0:
                     with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
                         executor.map(self.processEntryPMCID, identifiers, pmcids, timeout=50)
-                    # reinit
-                    i = 0
-                    identifiers = []
-                    pmcids = []
 
-                the_pmcid = line.strip()
-
-                if the_pmcid == 'pmc':
-                    continue
-
-                # check if the entry has already been processed
-                identifier = self.getUUIDByStrongIdentifier(the_pmcid)
-                if identifier is None:
-                    # we need a new identifier
-                    identifier = str(uuid.uuid4())
-
-                identifiers.append(identifier)
-                pmcids.append(the_pmcid)
-    
-                line_count += 1
-                i += 1
-            
-            # we need to process the last incomplete batch, if not empty
-            if len(identifiers) > 0:
-                with ThreadPoolExecutor(max_workers=self.config["batch_size"]) as executor:
-                    executor.map(self.processEntryPMCID, identifiers, pmcids, timeout=50)
-
-            print("processed", str(line_count), "article PMC ID")
+            print("processed", str(count), "article PMC ID")
 
     def processEntryDOI(self, identifier, doi):
         localJson = None
@@ -1437,7 +1465,10 @@ def _grobid_url(grobid_base, grobid_port):
 
 def _download(url, filename):
     #result = _download_wget(url, filename)
-    result = _download_cloudscraper(url, filename)
+    try:
+        result = _download_cloudscraper(url, filename)
+    except:
+        logging.debug("_download_cloudscraper failed for " + url)
     if result != "success":
         if str(url).startswith("ftp"):
             result = _download_ftp(url, filename)
@@ -1478,9 +1509,9 @@ def _download_cloudscraper(url, filename: str, n=0, timeout_in_seconds=30):
                     f_out.write(file_data.content)
                     result = "success"
     except Exception:
-        logging.exception("Download failed for {0} with cloudscraper".format(url))
+        logging.debug("Download failed for {0} with cloudscraper".format(url))
     except InvalidSchema:
-        logging.exception("Download failed (invalid schema) for {0} with cloudscraper".format(url))
+        logging.debug("Download failed (invalid schema) for {0} with cloudscraper".format(url))
     return result
 
 def _download_wget(url, filename):
@@ -1707,7 +1738,7 @@ if __name__ == "__main__":
         full_diagnostic=full_diagnostic)
 
     if reset:
-        if input("You asked to reset the existing harvesting, this will removed all the already downloaded data files... are you sure? (y/n) ") == "y":
+        if input("\nYou asked to reset the existing harvesting, this will removed all the already downloaded data files... are you sure? (y/n) ") == "y":
             harvester.reset(True)
         else:
             print("skipping reset...")
