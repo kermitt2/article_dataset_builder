@@ -1,21 +1,3 @@
-## CORD-19 version 2021-11-15 
-
-
-
-
-Official changelog for this version: 
-
-```
----SUMMARY---
-total metadata rows: 831244
-CORD UIDs (new: 8797, removed: 522)
-
-Full text:
-  PDF - 296417 json (new: 4239, removed: 85)
-  PMC - 228979 json (new: 3298)
-```
-
-
 ## CORD-19 version 2021-07-26 
 
 
@@ -156,5 +138,6 @@ Here are the results regarding the CORD-19 version 5 ([metadata.csv](https://ai2
 | entries with structured full texts via GROBID | ~33,000 (JSON) | 41,070 (TEI XML) |
 | entries with structured full texts via PMC JATS | - | 15,955 (TEI XML) |
 | __total entries with at least one structured full text__ | __~33,000 (JSON)__ | __41,609 (TEI XML)__ |
+
 
 

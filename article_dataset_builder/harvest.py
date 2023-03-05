@@ -57,9 +57,9 @@ class Harverster(object):
     Usage: see the Readme.md file
     """
 
-    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False, only_download=False, only_dump=False, full_diagnostic=False):
+    def __init__(self, config_path='./config.json', thumbnail=False, sample=None, dump_metadata=False, annotation=False, apply_grobid=False, only_dump=False, full_diagnostic=False):
         # boolean indicating if we only want to download the raw files without structuring them into XML
-        self.only_download = only_download
+        self.apply_grobid = apply_grobid
         self.full_diagnostic = full_diagnostic
         self.only_dump = only_dump
 
@@ -108,7 +108,7 @@ class Harverster(object):
         self.config = json.loads(config_json)
 
         # test if GROBID is up and running, except if we just want to download raw files
-        if not self.only_download and not self.full_diagnostic and not self.only_dump:
+        if self.apply_grobid:
             the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
             the_url += "isalive"
             try:
@@ -162,7 +162,8 @@ class Harverster(object):
         # https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt
         if not os.path.isfile(resource_file):
             url = "ftp://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.txt"
-            logging.debug("Downloading PMC resource file: " + url)
+            logging.info("Downloading PMC resource file: " + url)
+            print("Downloading PMC resource file: " + url)
             _download(url, resource_file)
 
         envFilePath = os.path.join(self.resource_path, 'pmc_oa')
@@ -964,7 +965,7 @@ class Harverster(object):
                             localJson["has_valid_pdf"] = True
 
         # GROBIDification if PDF available and we don't limit ourself to just download
-        if not localJson["has_valid_tei"] and not self.only_download:
+        if not localJson["has_valid_tei"] and self.apply_grobid:
             tei_filename = os.path.join(self.config["data_path"], identifier+".grobid.tei.xml")
             annotation_filename = None
             if self.annotation:
@@ -1666,7 +1667,7 @@ def test():
     harvester = Harverster()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description = "COVIDataset harvester")
+    parser = argparse.ArgumentParser(description = "Scholar PDF harvester and converter")
     parser.add_argument("--dois", default=None, help="path to a file describing a dataset articles as a simple list of DOI (one per line)") 
     parser.add_argument("--cord19", default=None, help="path to the csv file describing the CORD-19 dataset articles") 
     parser.add_argument("--pmids", default=None, help="path to a file describing a dataset articles as a simple list of PMID (one per line)") 
@@ -1679,7 +1680,7 @@ if __name__ == "__main__":
     parser.add_argument("--diagnostic", action="store_true", help="perform a full consistency diagnostic on the harvesting and transformation process") 
     #parser.add_argument("--sample", type=int, default=None, help="harvest only a random sample of indicated size")
     parser.add_argument("--dump", action="store_true", help="write all the consolidated metadata in json in the file consolidated_metadata.json") 
-    parser.add_argument("--download", action="store_true", help="only download the raw files (PDF, NLM/JATS) without processing them") 
+    parser.add_argument("--grobid", action="store_true", help="process downloaded files with Grobid to generate full text XML") 
 
     args = parser.parse_args()
 
@@ -1694,7 +1695,7 @@ if __name__ == "__main__":
     annotation = args.annotation
     reprocess = args.reprocess
     full_diagnostic = args.diagnostic
-    only_download = args.download
+    apply_grobid = args.grobid
     #sample = args.sample
 
     harvester = Harverster(config_path=config_path, 
@@ -1702,7 +1703,7 @@ if __name__ == "__main__":
         sample=None, 
         dump_metadata=dump, 
         annotation=annotation, 
-        only_download=only_download,
+        apply_grobid=apply_grobid,
         full_diagnostic=full_diagnostic)
 
     if reset:
