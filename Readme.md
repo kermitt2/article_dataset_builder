@@ -1,3 +1,6 @@
+[![PyPI version](https://badge.fury.io/py/article_dataset_builder.svg)](https://badge.fury.io/py/article_dataset_builder)
+[![License](http://img.shields.io/:license-apache-blue.svg)](http://www.apache.org/licenses/LICENSE-2.0.html)
+
 # Open Access scholar PDF harvester and ingester
 
 Python utility for harvesting efficiently a large Open Access collection of scholar PDF (fault tolerant, can be resumed, parallel download and ingestion) and for transforming them into structured XML adapted to text mining and information retrieval applications.
