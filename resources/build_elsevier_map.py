@@ -4,7 +4,7 @@ import os
 """
 Build a map of pii, doi, pmid, and local pdf file for the Elsevier COVID-19 open resources. 
 To be executed at the root of the elsevier data resources after getting them on their sftp server.
-The map is printed in the console. After gzip it, it is expected under article-dataset-builder/resources/
+The map is printed in the console. After gzip it, it is expected under article_dataset_builder/resources/
 
 > python3 build_elsevier_map.py > elsevier_covid_map_23_03_2020.csv
 > gzip elsevier_covid_map_23_03_2020.csv

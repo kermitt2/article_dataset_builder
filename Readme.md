@@ -80,15 +80,15 @@ python3 -m pip install -r requirements.txt
 Finally install the project, preferably in editable state
 
 ```sh
-pip3 install -e .
+python3 -m pip  install -e .
 ```
 
 #### Using PyPI package
 
-PyPI packages are available for stable versions. Latest stable version is `0.2.0`:
+PyPI packages are available for stable versions. Latest stable version is `0.2.1`:
 
 ```
-python3 -m pip install article_dataset_builder==0.2.0
+python3 -m pip install article-dataset-builder==0.2.1
 ```
 
 ### Third party web services
@@ -381,7 +381,7 @@ Some [notes on CORD-19 harvesting](notes-cord19.md), including numbers for updat
 
 ## Converting the PMC XML JATS files into XML TEI
 
-After the harvesting and processing realised by `article_dataset_builder/harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is no loss of information from the JATS file. It requires [Pub2TEI](https://github.com/kermitt2/Pub2TEI) to be installed and the path to Pub2TEI `pub2tei_path` to be set in the `config.json` file of the `article-dataset-builder` project.
+After the harvesting and processing realised by `article_dataset_builder/harvest.py`, it is possible to convert of PMC XML JATS files into XML TEI. This will provide better XML quality than what can be extracted automatically by Grobid from the PDF. This conversion allows to have all the documents in the same XML TEI customization format. As the TEI format superseeds JATS, there is no loss of information from the JATS file. It requires [Pub2TEI](https://github.com/kermitt2/Pub2TEI) to be installed and the path to Pub2TEI `pub2tei_path` to be set in the `config.json` file of the `article_dataset_builder` project.
 
 To launch the conversion under the default `data/` directory:
 
