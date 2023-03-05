@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="article_dataset_builder",
-    version="0.2.0",
+    version="0.2.1",
     author="Patrice Lopez",
     author_email="patrice.lopez@science-miner.com",
     description="Open Access scholar PDF harvester, metadata aggregator and full-text ingester",
@@ -14,12 +14,12 @@ setup(
     python_requires='>=3.5',
     install_requires=[
         'boto3',
-        'python-magic'=='0.4.15',
-        'lmdb'=='0.94',
-        'tqdm'=='4.21',
+        'python-magic==0.4.15',
+        'lmdb==0.94',
+        'tqdm==4.21',
         'requests',
-        'cloudscraper'=='1.2.60'
-        'beautifulsoup4'=='4.10.0'
+        'cloudscraper==1.2.69',
+        'beautifulsoup4==4.11.2'
     ],
     classifiers=[
         "Programming Language :: Python :: 3.5",

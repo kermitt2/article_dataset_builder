@@ -8,7 +8,7 @@ The map is printed in the console. After gzip it, it is expected under article-d
 
 > python3 build_elsevier_map.py > elsevier_covid_map_23_03_2020.csv
 > gzip elsevier_covid_map_23_03_2020.csv
-> cp elsevier_covid_map_23_03_2020.csv.gz ~/article-dataset-builder/resources/
+> cp elsevier_covid_map_23_03_2020.csv.gz ~/article_dataset_builder/resources/
 
 """
 

@@ -12,7 +12,7 @@ Input currently supported:
 - list of PMC ID in a file, one DOI per line
 - metadata csv input file from [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), see the CORD-19 result section below to see the capacity of the tool to get more full texts and better data quality that the official dataset
 
-The harvesting is following fair-use (which means that it covers non re-sharable articles) and it is exploiting various Open Access sources. The harvesting thus should result in a close-to-optimal discovery of OA full texts. For instance, from the same CORD-19 metadata file, the tool can harvest 35.5% more usable full text than available in the CORD-19 dataset (140,322 articles with at least one usable full text versus 103,587 articles with at least one usable full text for the CORD-19 dataset version 2020-09-11), see statistics [here](https://github.com/kermitt2/article-dataset-builder#results-with-cord-19). 
+The harvesting is following fair-use (which means that it covers non re-sharable articles) and it is exploiting various Open Access sources. The harvesting thus should result in a close-to-optimal discovery of OA full texts. For instance, from the same CORD-19 metadata file, the tool can harvest 35.5% more usable full text than available in the CORD-19 dataset (140,322 articles with at least one usable full text versus 103,587 articles with at least one usable full text for the CORD-19 dataset version 2020-09-11), see statistics [here](https://github.com/kermitt2/article_dataset_builder#results-with-cord-19). 
 
 To do:
 - Apache Airflow for more complex task workflow and automated periodic incremental harvesting

@@ -1213,7 +1213,7 @@ class Harverster(object):
                 collection["name"] = "CORD-19"
                 collection["description"] = "Collection of Open Access research publications on COVID-19"
                 collection["version"] = "version of the collection - to be edited"
-                collection["harvester"] = "article-dataset-builder"
+                collection["harvester"] = "article_dataset_builder"
                 collection["documents"] = {}
                 collection["documents"]["distribution_entries_per_year"] = {}
                 collection["documents"]["distribution_harvested_per_year"] = {}
