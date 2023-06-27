@@ -21,7 +21,7 @@ import subprocess
 
 from requests.exceptions import InvalidSchema
 
-import S3
+from article_dataset_builder.S3 import S3
 import csv
 import time
 import uuid
@@ -32,7 +32,6 @@ import logging.handlers
 import cloudscraper
 from bs4 import BeautifulSoup
 from random import randint, choices
-
 
 map_size = 100 * 1024 * 1024 * 1024 
 logging.basicConfig(filename='harvester.log', filemode='w', level=logging.INFO)
@@ -1135,8 +1134,10 @@ class Harverster(object):
         """
         Strong identifiers depend on the data to be processed but typically includes DOI, sha, PMID, PMCID
         """
-        txn = self.env_uuid.begin()
-        return txn.get(strong_identifier.encode(encoding='UTF-8'))
+        uuid = None
+        with self.env_uuid.begin() as txn:
+            uuid = txn.get(strong_identifier.encode(encoding='UTF-8'))
+        return uuid
 
     def diagnostic(self, full=False, metadata_csv_file=None, cord19=False):
         """
@@ -1419,6 +1420,7 @@ def _get_random_user_agent():
                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"]
     weights = [0.2, 0.3, 0.5]
     user_agent = choices(user_agents, weights=weights, k=1)
+    return user_agent[0]
 
 def _is_valid_file(file, mime_type):
     target_mime = []
@@ -1464,18 +1466,29 @@ def _grobid_url(grobid_base, grobid_port):
     return the_url
 
 def _download(url, filename):
-    #result = _download_wget(url, filename)
-    try:
-        result = _download_cloudscraper(url, filename)
-    except:
-        logging.debug("_download_cloudscraper failed for " + url)
-    if result != "success":
-        if str(url).startswith("ftp"):
+    result = "fail"
+    if str(url).startswith("ftp"):  
+        result = _download_wget(url, filename)
+        if result != "success":
+            # this appears to be not reliable at all with lot of decompression errors
+            # but as last options why not
             result = _download_ftp(url, filename)
-            # if result != "success":
-            #     result = _download_wget(url, filename)
-        else:
-            result = _download_requests(url, filename)
+
+    if result != "success":
+        # note: cloudscraper does not support ftp
+        # to be checked for compressed file
+        try:
+            result = _download_cloudscraper(url, filename)
+        except:
+            logging.debug("_download_cloudscraper failed for " + url)
+    
+    # the following supports decompression well, but it is not very reliable
+    if result != "success":
+        result = _download_requests(url, filename)
+
+    if result != "success" and not str(url).startswith("ftp"):
+        result = _download_wget(url, filename)
+    
     return result
 
 def _download_cloudscraper(url, filename: str, n=0, timeout_in_seconds=30):
@@ -1516,19 +1529,20 @@ def _download_cloudscraper(url, filename: str, n=0, timeout_in_seconds=30):
 
 def _download_wget(url, filename):
     """ 
-    First try with Python requests (which handle well compression), then move to a more robust download approach
+    This is the most reliable download solution I found, but it does not handle well decompression (depending how the 
+    local wget was compiled)
     """
     result = "fail"
     # This is the most robust and reliable way to download files I found with Python... to rely on system wget :)
     #cmd = "wget -c --quiet" + " -O " + filename + ' --connect-timeout=10 --waitretry=10 ' + \
 
     cmd = "wget -c --quiet" + " -O " + filename + ' --timeout=15 --waitretry=0 --tries=5 --retry-connrefused ' + \
-        '--header="User-Agent: ' + _get_random_user_agent()+ '" ' + \
+        '--header="User-Agent: ' + _get_random_user_agent() + '" ' + \
         '--header="Accept: application/pdf, text/html;q=0.9,*/*;q=0.8" --header="Accept-Encoding: gzip, deflate" ' + \
         '--no-check-certificate ' + \
         '"' + url + '"'
 
-    logging.debug(cmd)
+    #logging.debug(cmd)
     try:
         result = subprocess.check_call(cmd, shell=True)
         

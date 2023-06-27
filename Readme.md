@@ -85,10 +85,10 @@ python3 -m pip  install -e .
 
 #### Using PyPI package
 
-PyPI packages are available for stable versions. Latest stable version is `0.2.1`:
+PyPI packages are available for stable versions. Latest stable version is normally `0.2.4`, but double check [here](https://pypi.org/project/article-dataset-builder/):
 
 ```
-python3 -m pip install article-dataset-builder==0.2.1
+python3 -m pip install article-dataset-builder==0.2.4
 ```
 
 ### Third party web services

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="article_dataset_builder",
-    version="0.2.1",
+    version="0.2.4",
     author="Patrice Lopez",
     author_email="patrice.lopez@science-miner.com",
     description="Open Access scholar PDF harvester, metadata aggregator and full-text ingester",
