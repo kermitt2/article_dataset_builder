@@ -2,10 +2,10 @@ import argparse
 import os
 import shutil
 import subprocess
-import S3
+from article_dataset_builder.S3 import S3
 import json
 import time
-from harvest import generateStoragePath
+from article_dataset_builder.harvest import generateStoragePath
 
 class Nlm2tei(object):
     """
