@@ -66,6 +66,7 @@ class Nlm2tei(object):
         # add dummy DTD files for JATS to avoid errors and crazy online DTD download
         open(os.path.join(temp_dir,"JATS-archivearticle1.dtd"), 'a').close()
         open(os.path.join(temp_dir,"JATS-archivearticle1-mathml3.dtd"), 'a').close()
+        open(os.path.join(temp_dir,"JATS-archivearticle1-3-mathml3.dtd"), 'a').close()
         open(os.path.join(temp_dir,"archivearticle1-mathml3.dtd"), 'a').close()
         open(os.path.join(temp_dir,"archivearticle1.dtd"), 'a').close()
         open(os.path.join(temp_dir,"archivearticle3.dtd"), 'a').close()
@@ -85,8 +86,8 @@ class Nlm2tei(object):
 
         cmd = "java -jar " + os.path.join(self.config["pub2tei_path"],"Samples","saxon9he.jar") + " -s:" + dir_path + \
             " -xsl:" + os.path.join(self.config["pub2tei_path"],"Stylesheets","Publishers.xsl") + \
-            " -o:" + temp_dir_out + " -dtd:off -a:off -expand:off " + \
-            " --parserFeature?uri=http%3A//apache.org/xml/features/nonvalidating/load-external-dtd:false -t" 
+            " -o:" + temp_dir_out + " -dtd:off -a:off -expand:off -t " + \
+            " --parserFeature?uri=http%3A//apache.org/xml/features/nonvalidating/load-external-dtd:false" 
         #print(cmd)
         try:
             result = subprocess.check_call(cmd, shell=True)
