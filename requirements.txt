@@ -1,6 +1,6 @@
 boto3
 python-magic==0.4.15
-lmdb==0.94
+lmdb==1.4.1
 tqdm==4.21
 requests
 cloudscraper==1.2.69

@@ -85,7 +85,8 @@ class Nlm2tei(object):
 
         cmd = "java -jar " + os.path.join(self.config["pub2tei_path"],"Samples","saxon9he.jar") + " -s:" + dir_path + \
             " -xsl:" + os.path.join(self.config["pub2tei_path"],"Stylesheets","Publishers.xsl") + \
-            " -o:" + temp_dir_out + " -dtd:off -a:off -expand:off -t"
+            " -o:" + temp_dir_out + " -dtd:off -a:off -expand:off " + \
+            " --parserFeature?uri=http%3A//apache.org/xml/features/nonvalidating/load-external-dtd:false -t" 
         #print(cmd)
         try:
             result = subprocess.check_call(cmd, shell=True)
