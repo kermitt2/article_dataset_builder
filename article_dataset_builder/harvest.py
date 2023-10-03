@@ -850,7 +850,7 @@ class Harverster(object):
             localJson["MAG_ID"] = row["mag_id"]
         if "who_covidence_id" in row and row["who_covidence_id"] is not None and len(row["who_covidence_id"])>0:      
             localJson["WHO_Covidence"] = row["who_covidence_id"]
-        if 'doi' in row and 'DOI' not in localJson and row["doi"] is not none and len(row["doi"])>0:
+        if 'doi' in row and 'DOI' not in localJson and row["doi"] is not None and len(row["doi"])>0:
             localJson['DOI'] = row["doi"]
         
         # add possible missing information in the metadata entry
