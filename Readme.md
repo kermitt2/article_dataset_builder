@@ -125,7 +125,7 @@ TBD
 ## Usage
 
 ```
-python3 article_dataset_builder/harvest.py --help
+python3 -m article_dataset_builder.harvest --help
 usage: harvest.py [-h] [--dois DOIS] [--cord19 CORD19] [--pmids PMIDS] [--pmcids PMCIDS]
                   [--config CONFIG] [--reset] [--reprocess] [--thumbnail] [--annotation]
                   [--diagnostic] [--dump] [--grobid]
@@ -158,14 +158,14 @@ Fill the file `config.json` with relevant service and parameter url.
 For example to harvest a list of DOI (one DOI per line):
 
 ```console
-python3 article_dataset_builder/harvest.py --dois test/dois.txt 
+python3 -m article_dataset_builder.harvest --dois test/dois.txt 
 ```
 
 Similarly for a list of PMID or PMC ID with Grobid conversion of the PDF as the are downloaded:
 
 ```console
-python3 article_dataset_builder/harvest.py --pmids test/pmids.txt --grobid
-python3 article_dataset_builder/harvest.py --pmcids test/pmcids.txt --grobid
+python3 -m article_dataset_builder.harvest --pmids test/pmids.txt --grobid
+python3 -m article_dataset_builder.harvest --pmcids test/pmcids.txt --grobid
 ```
 
 For example for the [CORD-19 dataset](https://pages.semanticscholar.org/coronavirus-research), you can use the [metadata.csv](https://ai2-semanticscholar-cord-19.s3-us-west-2.amazonaws.com/historical_releases.html) (last tested version from 2020-06-29) file by running: 
@@ -333,13 +333,13 @@ CORD-19 is updated regularly. Suppose that you have harvested one release of the
 If the harvesting was done with one version of the metadata file `metadata-2020-09-11.csv` (from the `2020-09-11` release):
 
 ```console
-python3 article_dataset_builder/harvest.py --cord19 metadata-2020-09-11.csv --config my_config.json --grobid
+python3 -m article_dataset_builder.harvest --cord19 metadata-2020-09-11.csv --config my_config.json --grobid
 ```
 
 The incremental update will be realized with a new version of the metadata file simply by specifying it:
 
 ```console
-python3 article_dataset_builder/harvest.py --cord19 metadata-2021-03-22.csv --config my_config.json --grobid
+python3 -m article_dataset_builder.harvest --cord19 metadata-2021-03-22.csv --config my_config.json --grobid
 ```
 
 The constraint is that the same data repository path is kept in the config file. The repository and its state will be reused to check if an entry has already been harvested or not.
