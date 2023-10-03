@@ -108,7 +108,7 @@ class Harverster(object):
 
         # test if GROBID is up and running, except if we just want to download raw files
         if self.apply_grobid:
-            the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
+            the_url = _grobid_url(self.config['grobid_base'])
             the_url += "isalive"
             try:
                 r = requests.get(the_url)
@@ -449,7 +449,7 @@ class Harverster(object):
                 )
             }
             
-            the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
+            the_url = _grobid_url(self.config['grobid_base'])
             the_url += "processFulltextDocument"
 
             # set the GROBID parameters
@@ -496,7 +496,7 @@ class Harverster(object):
                 )
             }
 
-            the_url = _grobid_url(self.config['grobid_base'], self.config['grobid_port'])
+            the_url = _grobid_url(self.config['grobid_base'])
             the_url += "referenceAnnotations"
 
             # set the GROBID parameters
@@ -1458,11 +1458,8 @@ def _biblio_glutton_url(biblio_glutton_url):
         res = biblio_glutton_url[:-1]
     return res+"/service/lookup?"
 
-def _grobid_url(grobid_base, grobid_port):
-    the_url = 'http://'+grobid_base
-    if grobid_port is not None and len(grobid_port)>0:
-        the_url += ":"+grobid_port
-    the_url += "/api/"
+def _grobid_url(grobid_url):
+    the_url = grobid_url + "/api/"
     return the_url
 
 def _download(url, filename):
