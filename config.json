@@ -14,8 +14,7 @@
     "biblio_glutton_base": "http://cloud.science-miner.com/glutton",
     "crossref_base": "https://api.crossref.org",
     "crossref_email": "",
-    "grobid_base": "localhost",
-    "grobid_port": "8070",
+    "grobid_base": "http://localhost:8070",
     "cord19_elsevier_map_path": "resources/elsevier_covid_map_26-07-2021.csv.gz",
     "cord19_elsevier_pdf_path": "",
     "pub2tei_path": ""
